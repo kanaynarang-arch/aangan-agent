@@ -182,3 +182,24 @@ describe("Vani webhook parsing", () => {
     expect(transcriptToText([{ role: "assistant", text: "Hi" }, { role: "user", text: "Hello" }])).toBe("Agent: Hi\nCaller: Hello");
   });
 });
+
+describe("booking happens after the call, not on it", () => {
+  const prompt = buildVaniPrompt();
+
+  it("keeps the exact pricing sentence, unchanged", () => {
+    expect(prompt).toContain(
+      "Pricing depends on the site, the materials you choose, and the scope. Your designer will walk you through it in detail at the consultation. I can book that for you right now if you'd like.",
+    );
+  });
+
+  it("tells the agent what to do after the caller says yes", () => {
+    expect(prompt).toMatch(/# After the caller says yes to a consultation/);
+    expect(prompt).toMatch(/do not ask twice/i);
+    expect(prompt).toContain("Thanks, I've noted that and passed it to your designer, who will confirm the slot with you.");
+  });
+
+  it("never claims the slot is booked or confirmed, and never names a tool", () => {
+    expect(prompt).not.toMatch(/\b(booked|confirmed)\b/i);
+    expect(prompt).not.toMatch(/cal\.com|calendar link|webhook|hubspot/i);
+  });
+});
