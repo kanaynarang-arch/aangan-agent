@@ -36,7 +36,8 @@ async function logAction(callId: string, a: ActionResult) {
 }
 
 function dashboardUrl(callId: string): string {
-  const base = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const base = process.env.APP_URL ?? (vercel ? `https://${vercel}` : "");
   return `${base}/calls/${callId}`;
 }
 
