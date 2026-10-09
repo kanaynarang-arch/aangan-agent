@@ -71,7 +71,7 @@ Only real phone calls are ever sent to HubSpot, Telegram or Cal.com. `LIVE_INTEG
 
 ## Testing with a Vani web call
 
-Open the agent in the Vani dashboard and press Start Test. A web call is stored as `source='test'`: it is scored and shows on the dashboard, but HubSpot, Telegram and Cal.com receive nothing, and the call page shows what would have been sent. To see the integrations fire end to end, set `TREAT_WEB_CALLS_AS_LIVE=true` in Vercel, redeploy, make one call, and set it back.
+Open the agent in the Vani dashboard and press Start Test. A web call is stored as `source='test'`: it is scored and shows on the dashboard, but HubSpot, Telegram and Cal.com receive nothing, and the call page shows what would have been sent. Vani's Chat mode is cheaper (about 1.30 rupees for 1 minute 43 seconds) but does not fire the webhook and keeps no transcript, so only the Audio mode exercises the full path. To see the integrations fire end to end, set `TREAT_WEB_CALLS_AS_LIVE=true` in Vercel, redeploy, make one call, and set it back.
 
 ## Test results
 
