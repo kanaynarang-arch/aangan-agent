@@ -15,6 +15,8 @@ export async function POST(req: Request) {
   const raw = await req.text();
   const sig = req.headers.get("x-vani-signature") ?? req.headers.get("x-signature") ?? req.headers.get("x-webhook-signature");
   if (!verifySignature(raw, sig, process.env.VANI_WEBHOOK_SECRET)) {
+    // Header names only (never values), to diagnose signature schemes.
+    console.warn("webhook rejected: bad or missing signature; headers:", [...req.headers.keys()].filter((h) => !/^(cookie|authorization)$/i.test(h)).join(","));
     return Response.json({ error: "invalid signature" }, { status: 401 });
   }
 
