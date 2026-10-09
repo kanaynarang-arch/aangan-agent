@@ -63,7 +63,7 @@ npm run dev                   # http://localhost:3000
 | Telegram | Handoff notes, review requests, urgent alerts, callbacks | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
 | Cal.com | Consultation booking from the caller's preferred time | `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID` |
 
-Only real phone calls are ever sent to HubSpot, Telegram or Cal.com. `LIVE_INTEGRATIONS=true` switches them on; Vani web test calls stay test data unless `TREAT_WEB_CALLS_AS_LIVE=true`.
+Only live calls are sent to HubSpot, Telegram or Cal.com. A real phone call is live by default. `LIVE_INTEGRATIONS=true` switches the integrations on, and `TREAT_WEB_CALLS_AS_LIVE=true` makes Vani web (WebRTC) test calls count as live too, so the full path can be checked end to end without a phone number. With the flag off, web calls stay test data. The deployed project currently has it on for the end-to-end check; set it back to `false` when you only want test calls.
 
 ## Vani setup
 
@@ -71,7 +71,7 @@ Only real phone calls are ever sent to HubSpot, Telegram or Cal.com. `LIVE_INTEG
 
 ## Testing with a Vani web call
 
-Open the agent in the Vani dashboard and press Start Test. A web call is stored as `source='test'`: it is scored and shows on the dashboard, but HubSpot, Telegram and Cal.com receive nothing, and the call page shows what would have been sent. Vani's Chat mode is cheaper (about 1.30 rupees for 1 minute 43 seconds) but does not fire the webhook and keeps no transcript, so only the Audio mode exercises the full path. To see the integrations fire end to end, set `TREAT_WEB_CALLS_AS_LIVE=true` in Vercel, redeploy, make one call, and set it back.
+Open the agent in the Vani dashboard and press Start Test (Audio mode). With `TREAT_WEB_CALLS_AS_LIVE=true`, which is how the deployment is currently set, the call is stored as `source='live'`: it is scored, shown on the dashboard, and a green lead is sent to HubSpot, Telegram and Cal.com. With the flag off it is stored as `source='test'` and the call page shows what would have been sent. Vani's Chat mode is cheaper (about 1.30 rupees for 1 minute 43 seconds) but does not fire the webhook and keeps no transcript, so only Audio mode exercises the full path.
 
 ## Test results
 
