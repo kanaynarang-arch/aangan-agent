@@ -34,7 +34,7 @@ Each is a one-line change in `src/lib/rules.ts` unless noted.
 
 ## Cost and data
 
-21. **Voice cost is computed from the real call duration** at `VOICE_RATE_INR_PER_MIN` (default 5.5). Offline fixtures spend no Vani minutes, so their voice cost is 0; AI cost is the real token cost.
+21. **Voice cost is computed from the real call duration** at `VOICE_RATE_INR_PER_MIN` (default 5.6; the Vani dashboard shows an estimate of about 5.60 per minute for this agent, the brief said 5 to 5.50). Offline fixtures spend no Vani minutes, so their voice cost is 0; AI cost is the real token cost.
 22. **Gemini model: `gemini-3.1-flash-lite`**, USD 0.25 per million input tokens and 1.50 per million output. The 2.5 models are closed to new accounts, and `gemini-3.5-flash-lite` costs more (0.30 and 2.50). About 1,300 input and 550 output tokens per call, roughly 10 paise. USD to rupee rate is a config value.
 23. **"Answered within 5 minutes"** is measured from call start to the agent answering. The agent picks up immediately, so processed calls with any duration count as answered; a missed call (T08) does not.
 24. **No login on the dashboard**, as specified. Anyone with the URL can see calls and press Approve or Drop. Fine for a case study; add auth before real callers' data goes in.
@@ -44,3 +44,10 @@ Each is a one-line change in `src/lib/rules.ts` unless noted.
 ## Tooling
 
 27. **GitHub CLI** was downloaded from its official release to a temp folder to push the repo, authorised with a one-time device code for the `kanaynarang-arch` account.
+
+## Vani
+
+28. **Agent created through Vani's API** (`scripts/setup-vani.ts`): create-agent, then persona and experience updates. Webhook registration is dashboard-only. Default voice kept; language is English with auto-detect so Hindi works.
+29. **Vani balance** was 100 rupees prepaid when I started. At about 5.60 a minute that is roughly 17 minutes in total; live test calls are limited to about 10 minutes (around 56 rupees) and the agent is capped at 6 minutes per call.
+30. **Live vs test for Vani calls.** A call is live only if its call id starts with `inbound` (a real phone call). The id format of web calls was not documented, so the first web call should be checked on the dashboard: it must show as a test call.
+31. **Secrets.** Nothing secret is in the repo. The deployed app holds the keys it needs as sensitive Vercel variables; the Vani API key (6 hour expiry) and the GitHub token (30 days) were only used for setup.

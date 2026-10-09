@@ -10,8 +10,9 @@
 - [x] Offline harness: T01-T20 (+ T17a) pass and are stored as `source='test'`
 - [x] Telegram bot and designers' group
 - [x] HubSpot service key, Cal.com API key and "Design Consultation" event type
-- [ ] GitHub repo (public) and push
-- [ ] Vercel project, env vars, deploy, signed webhook test
-- [ ] Vani agent created via API, webhook registered
-- [ ] README, components map, DECISIONS
+- [x] GitHub repo (public) and push
+- [x] Vercel project, env vars, deploy, no-login dashboard, signed webhook test (bad signature 401, good 200, duplicate ignored, non-final ignored)
+- [x] Vani agent created via API, webhook registered, connectivity test accepted
+- [x] README, components map, DECISIONS
 - [ ] One live Vani web test call (budget: about 10 minutes of the 100 rupee balance)
+- [ ] First live HubSpot / Cal.com / Telegram write (only happens on a real call, or a web call with `TREAT_WEB_CALLS_AS_LIVE=true`)

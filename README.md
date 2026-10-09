@@ -65,13 +65,21 @@ npm run dev                   # http://localhost:3000
 
 Only real phone calls are ever sent to HubSpot, Telegram or Cal.com. `LIVE_INTEGRATIONS=true` switches them on; Vani web test calls stay test data unless `TREAT_WEB_CALLS_AS_LIVE=true`.
 
+## Vani setup
+
+`npm run setup:vani` creates (or updates) the agent through Vani's API: prompt from `src/lib/vani-prompt.ts`, greeting, English with Hindi auto-detect, and a 6-minute call cap. It writes `VANI_AGENT_ID` to `.env`. The webhook is registered in the Vani dashboard (Developers, Webhooks): URL `/api/vani/webhook` on the deployed app, event `call_postprocessing`, the shared signing secret. The public API does not cover webhook registration.
+
+## Testing with a Vani web call
+
+Open the agent in the Vani dashboard and press Start Test. A web call is stored as `source='test'`: it is scored and shows on the dashboard, but HubSpot, Telegram and Cal.com receive nothing, and the call page shows what would have been sent. To see the integrations fire end to end, set `TREAT_WEB_CALLS_AS_LIVE=true` in Vercel, redeploy, make one call, and set it back.
+
 ## Test results
 
 All 20 phone cases plus one extra dropped-call case pass; see `fixtures/cases.ts` for the expectations (T01 to T20 are short paraphrases written for this repo, not the original transcripts).
 
 ## Cost
 
-Voice is billed at `VOICE_RATE_INR_PER_MIN` (default 5.5) on the real call duration. Scoring is one Gemini call of roughly 1,300 input and 550 output tokens, about 10 paise. Both appear per call and per month on the pipeline view.
+Voice is billed at `VOICE_RATE_INR_PER_MIN` (default 5.6) on the real call duration. Scoring is one Gemini call of roughly 1,300 input and 550 output tokens, about 10 paise. Both appear per call and per month on the pipeline view.
 
 ## Extending to WhatsApp and the web form
 

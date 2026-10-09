@@ -54,7 +54,7 @@ export const RULES = {
   ANSWER_SLA_SECONDS: 5 * 60,
 
   // ---- Costs
-  VOICE_RATE_INR_PER_MIN: Number(process.env.VOICE_RATE_INR_PER_MIN ?? 5.5),
+  VOICE_RATE_INR_PER_MIN: Number(process.env.VOICE_RATE_INR_PER_MIN ?? 5.6),
   USD_TO_INR: Number(process.env.USD_TO_INR ?? 90),
   GEMINI_MODEL: process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite",
   // USD per 1M tokens for the model above (standard tier, thinking billed as output)
