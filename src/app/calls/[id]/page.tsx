@@ -33,6 +33,44 @@ function bookingFor(c: CallRecord, actions: ActionRecord[]): { text: string; not
   return { text: "No booking: not a green lead", note: null };
 }
 
+type StepState = "ok" | "wait" | "skip" | "err" | "alert";
+interface Step { state: StepState; title: string; detail?: string; lines?: { label: string; text: string; tone: "ok" | "err" | "muted" }[] }
+const GLYPH: Record<StepState, string> = { ok: "✓", wait: "…", skip: "–", err: "!", alert: "▲" };
+
+/** The call's journey in plain steps: answered, scored, handed over, consultation. */
+function stepsFor(c: CallRecord, actions: ActionRecord[], bookingText: string): Step[] {
+  const steps: Step[] = [{ state: "ok", title: "Call answered", detail: `${whenFull(c.started_at)} · ${duration(c.duration_seconds)}` }];
+  if (c.status !== "processed" || !c.tier) {
+    steps.push({ state: c.error ? "err" : "wait", title: c.error ? "Could not be scored" : "Being scored", detail: c.error ?? "Refresh in a minute." });
+    return steps;
+  }
+  const counts = { met: 0, unclear: 0, failed: 0 } as Record<string, number>;
+  Object.values(c.criteria ?? {}).forEach((v) => { counts[v.status] = (counts[v.status] ?? 0) + 1; });
+  const rubric = c.criteria && c.tier !== "escalate" ? `Rubric: ${counts.met} met, ${counts.unclear} unclear, ${counts.failed} failed` : undefined;
+  const lines = actions.map((a) => { const w = actionWords(a); return { label: w.service, text: w.word, tone: w.tone }; });
+  const anyFailed = actions.some((a) => a.status === "failed");
+
+  const tierState: Record<string, StepState> = { green: "ok", amber: "wait", red: "err", escalate: "alert", dropped: "skip" };
+  steps.push({
+    state: tierState[c.tier] ?? "ok",
+    title: c.tier === "dropped" ? "Dropped call" : c.tier === "escalate" ? "Flagged as a complaint" : `Scored ${TIER_NOUN[c.tier]}`,
+    detail: c.tier === "dropped" ? "Too short or empty to score" : c.tier === "escalate" ? "An existing client is unhappy, so scoring is skipped" : rubric,
+  });
+
+  if (c.tier === "green" || c.review_status === "approved") {
+    steps.push({ state: anyFailed ? "err" : "ok", title: c.tier === "green" ? "Handed to a designer" : "Approved and handed over", lines });
+    steps.push({ state: c.consultation_booked ? "ok" : actions.some((a) => a.channel === "calcom" && a.status === "failed") ? "err" : "wait", title: "Consultation", detail: bookingText });
+  } else if (c.tier === "amber" || c.tier === "red") {
+    if (c.review_status === "dropped") steps.push({ state: "skip", title: "Dropped by a designer", lines });
+    else steps.push({ state: "wait", title: "Waiting for a designer", detail: c.tier === "red" ? "Closed politely on the call. Logged for a check before it is dropped. Red leads are never sent to HubSpot." : "A designer decides whether to take it on.", lines });
+  } else if (c.tier === "escalate") {
+    steps.push({ state: anyFailed ? "err" : "alert", title: "Urgent callback requested", detail: "A senior person should call back within 15 minutes.", lines });
+  } else {
+    steps.push({ state: anyFailed ? "err" : "skip", title: "Callback alert", detail: "Someone should call this number back.", lines });
+  }
+  return steps;
+}
+
 function leadFrom(c: CallRecord): Lead {
   const flags = c.flags ?? {};
   return {
@@ -56,6 +94,7 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
   const booking = bookingFor(c, actions);
   const note = scored ? noteForLead(leadFrom(c), booking.note) : null;
   const name = f?.name ?? c.caller_phone ?? "Unknown caller";
+  const steps = stepsFor(c, actions, booking.text);
 
   const fieldRows: [string, string | null][] = [
     ["Name", f?.name ?? null], ["Phone", c.caller_phone ?? f?.phone ?? null], ["Project type", f?.project_type ?? null], ["Space", f?.business_type ?? null],
@@ -156,24 +195,22 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
       </div>
 
       <div className="two">
-        <section className="panel" aria-label="What happened next">
-          <h2>What happened next</h2>
-          {actions.length === 0 ? (
-            <p className="muted">Nothing was sent.</p>
-          ) : (
-            <ul className="status-list">
-              {actions.map((a) => {
-                const w = actionWords(a);
-                return (
-                  <li key={a.id}>
-                    <b>{w.service}</b>
-                    <span style={{ color: w.tone === "err" ? "var(--red)" : w.tone === "ok" ? "var(--green)" : "var(--muted)" }}>{w.word}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          {c.tier === "red" && <p className="muted small">Red leads are never sent to HubSpot.</p>}
+        <section className="panel" aria-label="What happened to this call">
+          <h2>What happened to this call</h2>
+          <ol className="timeline">
+            {steps.map((st, i) => (
+              <li key={i} className={st.state}>
+                <span className="dot" aria-hidden="true">{GLYPH[st.state]}</span>
+                <h3>{st.title}</h3>
+                {st.detail && <div className="muted small">{st.detail}</div>}
+                {st.lines && st.lines.length > 0 && (
+                  <ul className="sub-lines">
+                    {st.lines.map((l, j) => <li key={j}><b>{l.label}</b> <span className={`tone-${l.tone}`}>{l.text}</span></li>)}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ol>
         </section>
 
         <section className="panel" aria-label="Cost">
