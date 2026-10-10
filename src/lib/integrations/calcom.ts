@@ -17,10 +17,16 @@ export function istLocalToUtcIso(local: string): string | null {
   return new Date(ms).toISOString();
 }
 
-/** Cal.com requires an attendee email; callers are never asked for one, so use a clearly synthetic address. */
-export function placeholderEmail(phone: string | null): string {
+/**
+ * Cal.com requires an attendee email and checks that it can receive mail, so a made-up address on a reserved domain is refused.
+ * Callers are never asked for one. With `CALCOM_ATTENDEE_EMAIL` set to the studio's own address, each booking uses a plus-address of it
+ * (name+lead-<digits>@domain), so Cal.com's confirmations reach the studio and no stranger's inbox. Without it, the synthetic
+ * address is used and Cal.com is expected to refuse, which the Telegram note reports as "NOT booked".
+ */
+export function placeholderEmail(phone: string | null, base: string | undefined = process.env.CALCOM_ATTENDEE_EMAIL): string {
   const digits = (phone ?? "unknown").replace(/\D/g, "") || "unknown";
-  return `lead-${digits}@leads.aangan-studio.example`;
+  const m = (base ?? "").trim().match(/^([^@+\s]+)@([^@\s]+\.[^@\s]+)$/);
+  return m ? `${m[1]}+lead-${digits}@${m[2]}` : `lead-${digits}@leads.aangan-studio.example`;
 }
 
 export async function bookConsultation(mode: Mode, lead: Lead): Promise<BookingOutcome> {

@@ -142,3 +142,14 @@ describe("dropped call and callback alerts", () => {
     expect(callbackProblemMessage({ ...lead }, "unanswered")).toMatch(/GOT NOTHING/);
   });
 });
+
+import { placeholderEmail } from "../src/lib/integrations/calcom";
+describe("Cal.com attendee email", () => {
+  it("uses a plus-address of the studio email, so confirmations go to the studio", () => {
+    expect(placeholderEmail("90000 00101", "desk@studio.in")).toBe("desk+lead-9000000101@studio.in");
+  });
+  it("falls back to the reserved address when no studio email is set or it looks wrong", () => {
+    expect(placeholderEmail("9000000101", undefined)).toMatch(/@leads\.aangan-studio\.example$/);
+    expect(placeholderEmail("9000000101", "not an email")).toMatch(/\.example$/);
+  });
+});
