@@ -65,19 +65,53 @@ export interface AiRunRecord {
 
 const srcClause = (s: SourceFilter, n = 1) => (s === "all" ? { sql: "true", params: [] as unknown[] } : { sql: `source = $${n}`, params: [s] });
 
-export async function listCalls(filter: ListFilter, source: SourceFilter): Promise<CallListItem[]> {
-  const src = srcClause(source);
-  const where = {
-    all: "true",
-    verify: "review_status = 'pending'",
-    urgent: "tier in ('escalate','dropped')",
-    handed: "tier = 'green'",
-  }[filter];
+export const TIER_OPTIONS = ["green", "amber", "red", "escalate", "dropped"] as const;
+export type TierOption = (typeof TIER_OPTIONS)[number];
+
+export interface ListOptions {
+  q?: string;
+  tier?: TierOption;
+}
+
+/** Escape LIKE wildcards so a search for "100%" or "a_b" matches literally. */
+const likeEscape = (v: string) => v.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+export async function listCalls(filter: ListFilter, source: SourceFilter, opts: ListOptions = {}): Promise<CallListItem[]> {
+  const params: unknown[] = [];
+  const where: string[] = [
+    { all: "true", verify: "review_status = 'pending'", urgent: "tier in ('escalate','dropped')", handed: "tier = 'green'" }[filter],
+  ];
+  if (source !== "all") {
+    params.push(source);
+    where.push(`source = $${params.length}`);
+  }
+  if (opts.tier) {
+    params.push(opts.tier);
+    where.push(`tier = $${params.length}`);
+  }
+  const q = opts.q?.trim().slice(0, 80);
+  if (q) {
+    params.push(`%${likeEscape(q)}%`);
+    const n = params.length;
+    const ors = [`fields->>'name' ilike $${n}`, `fields->>'location' ilike $${n}`, `caller_phone ilike $${n}`];
+    const digits = q.replace(/\D/g, "");
+    if (digits.length >= 3 && digits.length >= q.replace(/\s/g, "").length - 2) {
+      params.push(`%${digits}%`);
+      ors.push(`caller_phone ilike $${params.length}`);
+    }
+    where.push(`(${ors.join(" or ")})`);
+  }
   return query<CallListItem>(
     `select id, source, fixture_id, caller_phone, started_at, duration_seconds, tier, status, outcome, review_status, fields, flags, consultation_booked
-     from calls where ${where} and ${src.sql} order by started_at desc limit 200`,
-    src.params,
+     from calls where ${where.join(" and ")} order by started_at desc limit 200`,
+    params,
   );
+}
+
+/** How many live (non-test) calls exist. Decides the Pipeline view's default. */
+export async function liveCallCount(): Promise<number> {
+  const r = await query<{ n: string }>("select count(*) as n from calls where source = 'live'");
+  return Number(r[0]?.n ?? 0);
 }
 
 export async function filterCounts(source: SourceFilter) {
@@ -109,6 +143,7 @@ export async function pipelineMetrics(source: SourceFilter) {
        count(*) filter (where outside_hours) as outside,
        count(*) filter (where consultation_booked) as booked,
        count(*) filter (where status = 'failed') as failed,
+       count(*) filter (where source = 'test') as test_calls,
        coalesce(sum(voice_cost_inr),0) as voice, coalesce(sum(ai_cost_inr),0) as ai
      from calls where ${src.sql}`, src.params);
   const tiers = await query<{ tier: string; n: string }>(
@@ -120,7 +155,7 @@ export async function pipelineMetrics(source: SourceFilter) {
   const received = +t.received;
   const voice = +t.voice, ai = +t.ai;
   return {
-    received, answered5: +t.answered_5, outside: +t.outside, booked: +t.booked, failed: +t.failed,
+    received, answered5: +t.answered_5, outside: +t.outside, booked: +t.booked, failed: +t.failed, testCalls: +t.test_calls,
     voice, ai, total: voice + ai, perCall: received ? (voice + ai) / received : 0,
     tiers: Object.fromEntries(tiers.map((x) => [x.tier, +x.n])) as Record<string, number>,
     monthly: monthly.map((m) => ({ month: m.month, calls: +m.calls, voice: +m.voice, ai: +m.ai, total: +m.voice + +m.ai })),
