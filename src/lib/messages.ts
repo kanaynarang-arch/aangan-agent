@@ -4,16 +4,18 @@ import type { Lead } from "./integrations/types";
 const line = (label: string, v: unknown) => (v == null || v === "" ? null : `${label}: ${v}`);
 
 /** One short line built from the stored rubric reasons: at most three, rule-check overrides only if nothing else. */
-export function whyLine(reasons: string[], max = 3, limit = 160): string {
+export function whyLine(reasons: string[], max = 3, limit = 160, ruleFirst = false): string {
   const clean = (r: string) => r.replace(/^Rule check:\s*/i, "").replace(/\s+/g, " ").trim().replace(/[.\s]+$/, "");
   const main = reasons.filter((r) => !/^Rule check:/i.test(r)).map(clean).filter(Boolean);
-  const picks = (main.length ? main : reasons.map(clean).filter(Boolean)).slice(0, max);
+  // For amber and red the rule check is the reason the tier is not green, so it goes first rather than being dropped.
+  const rules = ruleFirst ? reasons.filter((r) => /^Rule check:/i.test(r)).map(clean).filter(Boolean) : [];
+  const picks = (rules.length ? [...rules, ...main] : main.length ? main : reasons.map(clean).filter(Boolean)).slice(0, max);
   const out = picks.join("; ");
   return out.length > limit ? `${out.slice(0, limit - 1).trimEnd()}…` : out;
 }
 
 function whyLines(l: Lead, label: string): string | null {
-  const w = whyLine(l.reasons ?? []);
+  const w = whyLine(l.reasons ?? [], 3, 160, label === "amber" || label === "red");
   return w ? `Why ${label}: ${w}` : null;
 }
 

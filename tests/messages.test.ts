@@ -153,3 +153,11 @@ describe("Cal.com attendee email", () => {
     expect(placeholderEmail("9000000101", "not an email")).toMatch(/\.example$/);
   });
 });
+
+describe("amber and red say what held them back", () => {
+  it("puts the rule check first, so the reason is not hidden behind the good points", () => {
+    const reasons = ["Project is a residential home in Pune.", "Timeline of eight weeks is acceptable.", "Rule check: timeline: met -> unclear (needs completion in about 8 weeks, tight against 6 to 10 weeks)"];
+    expect(whyLine(reasons, 3, 400, true)).toMatch(/^timeline: met -> unclear/);
+    expect(whyLine(reasons, 3, 400, false)).not.toMatch(/unclear/);
+  });
+});
