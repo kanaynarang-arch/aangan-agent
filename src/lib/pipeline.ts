@@ -24,6 +24,7 @@ export interface CallRow {
   tier: Tier | null;
   handoff_summary: string | null;
   uncertain: string[] | null;
+  reasons: string[] | null;
   flags: { asked_about_price?: boolean; handle_with_care?: string | null; repeat_caller?: boolean } | null;
   review_status: string;
 }
@@ -94,7 +95,7 @@ export async function processCall(callId: string, opts: { force?: boolean } = {}
     const flags = { asked_about_price: askedPrice, handle_with_care: result.handleWithCare ?? null, repeat_caller: repeat };
 
     const lead: Lead = {
-      callId, phone, tier: result.tier, fields: result.fields, summary: result.summary, uncertain: result.uncertain,
+      callId, phone, tier: result.tier, fields: result.fields, summary: result.summary, reasons: result.reasons, uncertain: result.uncertain,
       askedAboutPrice: askedPrice, handleWithCare: result.handleWithCare ?? null, repeatCaller: repeat,
       recordingUrl: call.recording_url, durationSeconds: call.duration_seconds, dashboardUrl: dashboardUrl(callId),
     };
@@ -188,6 +189,7 @@ export async function approveReview(callId: string): Promise<void> {
   const flags = call.flags ?? {};
   const lead: Lead = {
     callId, phone: call.caller_phone, tier: "green", fields: call.fields, summary: call.handoff_summary ?? "",
+    reasons: call.reasons ?? [], originalTier: call.tier === "amber" || call.tier === "red" ? call.tier : undefined,
     uncertain: call.uncertain ?? [], askedAboutPrice: Boolean(flags.asked_about_price), handleWithCare: flags.handle_with_care ?? null,
     repeatCaller: Boolean(flags.repeat_caller), recordingUrl: call.recording_url, durationSeconds: call.duration_seconds, dashboardUrl: dashboardUrl(callId),
   };

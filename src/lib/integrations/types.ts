@@ -7,6 +7,10 @@ export interface Lead {
   tier: "green" | "amber" | "red" | "escalate" | "dropped";
   fields: ScoreOutput["fields"] | null;
   summary: string;
+  /** Rubric reasons for the tier, as stored on the call. */
+  reasons: string[];
+  /** Set when a designer approves an amber or red lead, so the note says why it was that tier. */
+  originalTier?: "green" | "amber" | "red";
   uncertain: string[];
   askedAboutPrice: boolean;
   handleWithCare: string | null;
