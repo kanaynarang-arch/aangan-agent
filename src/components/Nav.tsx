@@ -8,7 +8,8 @@ function Brand() {
     <Link href="/" className="brand">
       <svg className="mark" viewBox="0 0 64 64" aria-hidden="true">
         <rect width="64" height="64" rx="14" fill="currentColor" opacity=".12" />
-        <path d="M32 12 14 52h9l3.6-9h10.8l3.6 9h9L32 12Zm0 15.5L36.6 37h-9.2L32 27.5Z" fill="currentColor" />
+        <path d="M19 49V31a13 13 0 0 1 26 0v18" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+        <path d="M13 49h38" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" />
       </svg>
       <span>Aangan Studio<small>Phone agent</small></span>
     </Link>
