@@ -107,7 +107,7 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
 
   const tel = c.source === "live" ? telHref(c.caller_phone) : null;
   const live = c.source === "live";
-  const mode = callbackMode();
+  const mode = callbackMode(c.source);
   const elig = callbackEligibility(c, callbacks, new Date(), mode);
   const showCallback = Boolean(scored) && (c.tier === "dropped" || callbacks.length > 0) && !c.callback_of;
 

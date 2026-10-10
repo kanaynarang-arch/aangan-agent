@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RULES } from "../src/lib/rules";
 import { buildCallbackPrompt, callbackGreeting } from "../src/lib/callback-prompt";
-import { briefFor, callbackEligibility, toE164, type PriorAttempt } from "../src/lib/outbound";
+import { briefFor, callbackEligibility, callbackMode, toE164, type PriorAttempt } from "../src/lib/outbound";
 import type { ScoreOutput } from "../src/lib/scoring/schema";
 
 const MONEY = [/₹\s*[\d,.]+/i, /\b(rs\.?|inr|rupees?)\s*[\d,.]+/i, /[\d,.]+\s*(rs\b|rupees?|lakhs?|lacs?|crores?|cr\b|k\b)/i, /\bper\s*(sq\.?\s*ft|square)/i];
@@ -71,5 +71,14 @@ describe("automatic callbacks", () => {
     expect(autoCallbackEnabled({ AUTO_CALLBACK_DROPPED: "true" })).toBe(false);
     expect(autoCallbackEnabled({ VANI_PHONE_CALLBACKS: "true" })).toBe(false);
     expect(autoCallbackEnabled({ VANI_PHONE_CALLBACKS: "true", AUTO_CALLBACK_DROPPED: "true" })).toBe(true);
+  });
+});
+
+describe("which kind of callback", () => {
+  it("live calls are rung when switched on; test calls always rehearse in the browser", () => {
+    const on = { VANI_PHONE_CALLBACKS: "true" };
+    expect(callbackMode("live", on)).toBe("phone");
+    expect(callbackMode("test", on)).toBe("browser");
+    expect(callbackMode("live", {})).toBe("browser");
   });
 });

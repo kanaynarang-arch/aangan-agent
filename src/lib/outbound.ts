@@ -15,8 +15,12 @@ export type CallbackMode = "browser" | "phone";
 export interface PriorAttempt { status: string; created_at: string }
 export type Eligibility = { ok: true; reason: CallbackReason; phone: string | null } | { ok: false; why: string };
 
-/** Browser mode needs no phone number and rings nobody. Phone mode rings the lead and needs a number connected in Vani. */
-export const callbackMode = (): CallbackMode => (process.env.VANI_PHONE_CALLBACKS === "true" ? "phone" : "browser");
+/**
+ * Live calls are rung for real when phone callbacks are switched on. Test calls always use the browser rehearsal, because their
+ * numbers are made up and a rehearsal rings nobody. With the switch off, everything uses the browser.
+ */
+export const callbackMode = (source: "live" | "test", env: Record<string, string | undefined> = process.env): CallbackMode =>
+  env.VANI_PHONE_CALLBACKS === "true" && source === "live" ? "phone" : "browser";
 const DAILY_CAP = 20;
 
 /** "9000000101", "+91 90000 00101", "09000000101" to "+919000000101". Anything else is rejected, never guessed. */
@@ -94,11 +98,10 @@ function overrides(brief: CallbackBrief) {
 export async function startCallback(callId: string, now = new Date()): Promise<StartResult> {
   const key = process.env.VANI_API_KEY, agent = process.env.VANI_AGENT_ID;
   if (!key || !agent) return { ok: false, message: "Calling is not set up on this server yet." };
-  const mode = callbackMode();
-
   const rows = await query<CallRecord>("select * from calls where id = $1", [callId]);
   const c = rows[0];
   if (!c) return { ok: false, message: "That call no longer exists." };
+  const mode = callbackMode(c.source);
   const prior = await query<PriorAttempt>("select status, created_at from outbound_calls where call_id = $1", [callId]);
   const e = callbackEligibility(c, prior, now, mode);
   if (!e.ok) return { ok: false, message: e.why };
