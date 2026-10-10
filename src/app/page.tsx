@@ -45,6 +45,13 @@ export default async function DesignerView({ searchParams }: { searchParams: Pro
         ))}
       </nav>
 
+      {filter !== "verify" && counts.verify > 0 && (
+        <p className="callout" role="note">
+          <span>{counts.verify} lead{counts.verify === 1 ? " is" : "s are"} waiting for a designer.</span>
+          <Link href={href("/", { source: keep.source, filter: "verify" })}>Open the verify queue →</Link>
+        </p>
+      )}
+
       <form className="filters" role="search" action="/" method="get">
         {keep.source && <input type="hidden" name="source" value={keep.source} />}
         {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
@@ -89,7 +96,7 @@ export default async function DesignerView({ searchParams }: { searchParams: Pro
             </thead>
             <tbody>
               {calls.map((c) => (
-                <tr key={c.id} className="row">
+                <tr key={c.id} className={`row tier-${c.tier ?? "pending"}`}>
                   <td data-label="When" className="small num">{when(c.started_at)}</td>
                   <td data-label="Caller" className="primary">
                     <Link className="rowlink" href={`/calls/${c.id}`}>{c.fields?.name ?? c.caller_phone ?? "Unknown caller"}</Link>
