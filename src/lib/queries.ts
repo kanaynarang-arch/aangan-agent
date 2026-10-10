@@ -140,15 +140,20 @@ export async function getCall(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const rows = await query<CallRecord>("select * from calls where id = $1", [id]);
   if (!rows[0]) return null;
-  const actions = await query<ActionRecord>("select * from actions where call_id = $1 order by created_at", [id]);
-  const runs = await query<AiRunRecord>("select * from ai_runs where call_id = $1 order by created_at", [id]);
-  const callbacks = await query<CallbackRecord>("select * from outbound_calls where call_id = $1 order by created_at desc", [id]);
+  const [actions, runs, callbacks] = await Promise.all([
+    query<ActionRecord>("select * from actions where call_id = $1 order by created_at", [id]),
+    query<AiRunRecord>("select * from ai_runs where call_id = $1 order by created_at", [id]),
+    query<CallbackRecord>("select * from outbound_calls where call_id = $1 order by created_at desc", [id]),
+  ]);
   return { call: rows[0], actions, runs, callbacks };
 }
 
 export async function pipelineMetrics(source: SourceFilter) {
   const src = srcClause(source);
-  const [t] = await query<Record<string, string>>(
+  // The five queries are independent, so they run together.
+  const cbSql = src.sql.replace(/\b(source|started_at)\b/g, "calls.$1");
+  const [[t], tiers, monthly, [cb], cbMonthly] = await Promise.all([
+    query<Record<string, string>>(
     `select count(*) filter (where callback_of is null) as received,
        count(*) filter (where callback_of is null and answered_at is not null and extract(epoch from (answered_at - started_at)) <= ${RULES.ANSWER_SLA_SECONDS}) as answered_5,
        count(*) filter (where callback_of is null and outside_hours) as outside,
@@ -156,19 +161,20 @@ export async function pipelineMetrics(source: SourceFilter) {
        count(*) filter (where status = 'failed') as failed,
        count(*) filter (where source = 'test') as test_calls,
        coalesce(sum(voice_cost_inr),0) as voice, coalesce(sum(ai_cost_inr),0) as ai
-     from calls where ${src.sql}`, src.params);
-  const tiers = await query<{ tier: string; n: string }>(
-    `select coalesce(tier,'pending') as tier, count(*) as n from calls where ${src.sql} group by 1`, src.params);
-  const monthly = await query<{ month: string; calls: string; voice: string; ai: string }>(
+     from calls where ${src.sql}`, src.params),
+    query<{ tier: string; n: string }>(
+    `select coalesce(tier,'pending') as tier, count(*) as n from calls where ${src.sql} group by 1`, src.params),
+    query<{ month: string; calls: string; voice: string; ai: string }>(
     `select to_char(started_at at time zone '${RULES.TIME_ZONE}', 'YYYY-MM') as month, count(*) as calls,
        sum(voice_cost_inr) as voice, sum(ai_cost_inr) as ai
-     from calls where ${src.sql} group by 1 order by 1 desc limit 12`, src.params);
-  // A callback that became its own call is already costed as a call. Only callbacks with no lead (nobody spoke) add voice cost here.
-  const [cb] = await query<{ voice: string }>(
-    `select coalesce(sum(o.voice_cost_inr),0) as voice from outbound_calls o join calls on calls.id = o.call_id where o.lead_call_id is null and ${src.sql.replace(/\b(source|started_at)\b/g, "calls.$1")}`, src.params);
-  const cbMonthly = await query<{ month: string; voice: string }>(
+     from calls where ${src.sql} group by 1 order by 1 desc limit 12`, src.params),
+    // A callback that became its own call is already costed as a call. Only callbacks with no lead (nobody spoke) add voice cost here.
+    query<{ voice: string }>(
+    `select coalesce(sum(o.voice_cost_inr),0) as voice from outbound_calls o join calls on calls.id = o.call_id where o.lead_call_id is null and ${cbSql}`, src.params),
+    query<{ month: string; voice: string }>(
     `select to_char(o.created_at at time zone '${RULES.TIME_ZONE}', 'YYYY-MM') as month, sum(o.voice_cost_inr) as voice
-     from outbound_calls o join calls on calls.id = o.call_id where o.lead_call_id is null and ${src.sql.replace(/\b(source|started_at)\b/g, "calls.$1")} group by 1`, src.params);
+     from outbound_calls o join calls on calls.id = o.call_id where o.lead_call_id is null and ${cbSql} group by 1`, src.params),
+  ]);
   const received = +t.received;
   const voice = +t.voice + +cb.voice, ai = +t.ai;
   return {

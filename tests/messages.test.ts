@@ -161,3 +161,14 @@ describe("amber and red say what held them back", () => {
     expect(whyLine(reasons, 3, 400, false)).not.toMatch(/unclear/);
   });
 });
+
+import { safeHttpUrl } from "../src/components/ui";
+describe("recording links", () => {
+  it("only follows http and https", () => {
+    expect(safeHttpUrl("https://app.vaanivoice.ai/api/stream/x?token=1")).toContain("https://");
+    expect(safeHttpUrl("javascript:alert(1)")).toBeNull();
+    expect(safeHttpUrl("data:text/html,x")).toBeNull();
+    expect(safeHttpUrl(null)).toBeNull();
+    expect(safeHttpUrl("not a url")).toBeNull();
+  });
+});

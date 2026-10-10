@@ -113,9 +113,16 @@ export async function startCallback(callId: string, now = new Date()): Promise<S
   if (Number(today.n) >= DAILY_CAP) return { ok: false, message: `The daily limit of ${DAILY_CAP} callbacks has been reached. Try again tomorrow.` };
   const brief = briefFor(c, e.reason);
 
+  // The cooldown is checked inside the insert itself, so two requests at the same instant (a double click, or the automatic
+  // callback and the morning sweep) cannot both ring a real person.
+  const guard = mode === "phone"
+    ? `where not exists (select 1 from outbound_calls where call_id = $1::uuid and status <> 'failed' and created_at > now() - interval '${COOLDOWN_MINUTES} minutes')`
+    : "";
   const [row] = await query<{ id: string }>(
-    "insert into outbound_calls (call_id, mode, to_phone, reason) values ($1,$2,$3,$4) returning id", [callId, mode, e.phone, e.reason],
+    `insert into outbound_calls (call_id, mode, to_phone, reason) select $1::uuid, $2::text, $3::text, $4::text ${guard} returning id`,
+    [callId, mode, e.phone, e.reason],
   );
+  if (!row) return { ok: false, message: "Vani rang this person a moment ago. Wait for that call to finish." };
   const fail = async (error: string, message: string) => {
     await query("update outbound_calls set status = 'failed', error = $2 where id = $1", [row.id, error.slice(0, 300)]);
     if (mode === "phone") await tellDesigners(callId, "failed", message);

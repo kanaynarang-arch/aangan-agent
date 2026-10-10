@@ -99,3 +99,14 @@ export function actionWords(a: { channel: string; status: string; detail: Record
     default: return { service, word: `Failed${a.detail?.error ? `: ${String(a.detail.error)}` : ""}`, tone: "err" };
   }
 }
+
+/** Only http(s) links are followed, so a bad value from outside can never become a script link. */
+export function safeHttpUrl(u: string | null | undefined): string | null {
+  if (!u) return null;
+  try {
+    const p = new URL(u);
+    return p.protocol === "https:" || p.protocol === "http:" ? p.toString() : null;
+  } catch {
+    return null;
+  }
+}

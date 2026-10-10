@@ -13,7 +13,7 @@ import { CallbackPanel } from "@/components/CallbackPanel";
 import { callbackEligibility, callbackMode, toE164 } from "@/lib/outbound";
 import { CopyNote } from "@/components/CopyNote";
 import { ReviewPanel } from "@/components/ReviewPanel";
-import { TierBadge, actionWords, duration, formatPhone, inr, telHref, whenFull } from "@/components/ui";
+import { TierBadge, actionWords, safeHttpUrl, duration, formatPhone, inr, telHref, whenFull } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Call detail" };
@@ -141,13 +141,13 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
 
             {reasons.length > 0 && (
               <>
-                <h3>Why {c.tier ? TIER_NOUN[c.tier] : "this tier"}</h3>
+                <h2 className="subhead">Why {c.tier ? TIER_NOUN[c.tier] : "this tier"}</h2>
                 <ul className="why">{reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
               </>
             )}
             {uncertain.length > 0 && (
               <>
-                <h3>Please check</h3>
+                <h2 className="subhead">Please check</h2>
                 <ul className="why">{uncertain.map((u, i) => <li key={i}>{u}</li>)}</ul>
               </>
             )}
@@ -230,7 +230,7 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
                           <small>{whenFull(cb.created_at)} · {cb.mode === "phone" ? "Rang their phone" : "In the browser"} · {cb.status === "completed" ? duration(cb.duration_seconds) : cb.status === "failed" ? "Did not start" : "In progress or waiting for the transcript"}</small>
                           {cb.status === "failed" && <span className="muted small">{cb.error}</span>}
                           {cb.lead_call_id && <Link className="b sm" style={{ margin: "var(--s-2) 0" }} href={`/calls/${cb.lead_call_id}`}>Open the lead it created</Link>}
-                          {cb.recording_url && <a className="b sm" style={{ margin: "var(--s-2) 0" }} href={cb.recording_url} target="_blank" rel="noreferrer">Open the recording</a>}
+                          {safeHttpUrl(cb.recording_url) && <a className="b sm" style={{ margin: "var(--s-2) 0" }} href={safeHttpUrl(cb.recording_url)!} target="_blank" rel="noreferrer">Open the recording</a>}
                           {cb.transcript && <Transcript text={cb.transcript} />}
                         </span>
                       </li>
@@ -243,7 +243,7 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
 
           <section className="card" aria-label="Transcript and recording">
             <h2>Transcript</h2>
-            {c.recording_url ? <p style={{ margin: "var(--s-3) 0" }}><a className="b sm" href={c.recording_url} target="_blank" rel="noreferrer"><Icon name="phone" />Open the recording</a></p> : <p className="muted small">No recording for this call.</p>}
+            {safeHttpUrl(c.recording_url) ? <p style={{ margin: "var(--s-3) 0" }}><a className="b sm" href={safeHttpUrl(c.recording_url)!} target="_blank" rel="noreferrer"><Icon name="phone" />Open the recording</a></p> : <p className="muted small">No recording for this call.</p>}
             {c.transcript ? <Transcript text={c.transcript} /> : <p className="muted">No transcript: nothing was captured for this call.</p>}
           </section>
         </div>
