@@ -1,5 +1,8 @@
 import { query } from "./db";
-import { processCall } from "./pipeline";
+import { dashboardUrl, processCall } from "./pipeline";
+import { callbackProblemMessage } from "./messages";
+import { sendTelegram } from "./integrations/telegram";
+import { modeFor, type Lead } from "./integrations/types";
 import type { VaniCall } from "./vani";
 import { captureSummary } from "./capture";
 import { buildCallbackPrompt, callbackGreeting, type CallbackBrief, type CallbackReason } from "./callback-prompt";
@@ -115,6 +118,7 @@ export async function startCallback(callId: string, now = new Date()): Promise<S
   );
   const fail = async (error: string, message: string) => {
     await query("update outbound_calls set status = 'failed', error = $2 where id = $1", [row.id, error.slice(0, 300)]);
+    if (mode === "phone") await tellDesigners(callId, "failed", message);
     return { ok: false as const, message };
   };
 
@@ -145,6 +149,25 @@ export async function startCallback(callId: string, now = new Date()): Promise<S
   }
 }
 
+/**
+ * A real callback did not produce a lead, so tell the designers' group to ring the number themselves. Live calls only,
+ * and it must never break the callback flow itself.
+ */
+export async function tellDesigners(callId: string, kind: "failed" | "unanswered", detail?: string): Promise<void> {
+  try {
+    const [c] = await query<{ source: "live" | "test"; caller_phone: string | null; duration_seconds: number }>("select source, caller_phone, duration_seconds from calls where id = $1", [callId]);
+    if (!c || c.source !== "live") return;
+    const lead: Lead = {
+      callId, phone: c.caller_phone, tier: "dropped", fields: null, summary: "", reasons: [], uncertain: [], askedAboutPrice: false,
+      handleWithCare: null, repeatCaller: false, recordingUrl: null, durationSeconds: c.duration_seconds, dashboardUrl: dashboardUrl(callId),
+    };
+    const r = await sendTelegram(modeFor(c.source), callbackProblemMessage(lead, kind, detail), `callback_${kind}`);
+    await query("insert into actions (call_id, channel, status, detail, external_id) values ($1,'telegram',$2,$3,$4)", [callId, r.status, JSON.stringify(r.detail), r.externalId ?? null]);
+  } catch (e) {
+    console.error("could not tell designers about the callback", callId, (e as Error).message);
+  }
+}
+
 interface OutboundRow { id: string; call_id: string; mode: CallbackMode; to_phone: string | null }
 
 /**
@@ -153,7 +176,11 @@ interface OutboundRow { id: string; call_id: string; mode: CallbackMode; to_phon
  * can reach HubSpot, Telegram or Cal.com from someone playing the caller.
  */
 export async function createLeadFromCallback(cb: OutboundRow, call: VaniCall): Promise<string | null> {
-  if (!call.transcript || !call.vaniCallId) return null;
+  if (!call.transcript || !call.vaniCallId) {
+    // Nobody spoke: a real callback that reached no one needs a person.
+    if (cb.mode === "phone") await tellDesigners(cb.call_id, "unanswered");
+    return null;
+  }
   const [orig] = await query<{ source: "live" | "test"; caller_phone: string | null }>("select source, caller_phone from calls where id = $1", [cb.call_id]);
   if (!orig) return null;
   const source = cb.mode === "phone" ? orig.source : "test";

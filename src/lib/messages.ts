@@ -88,12 +88,34 @@ export function escalationMessage(l: Lead): string {
     .join("\n");
 }
 
-export function droppedMessage(l: Lead): string {
+/** When Vani is set to ring a dropped call back by itself: straight away in hours, or in the morning sweep. */
+export type CallbackPlan = "now" | "morning" | null;
+
+export function droppedMessage(l: Lead, plan: CallbackPlan = null): string {
+  const plans: Record<"now" | "morning", string> = {
+    now: "Vani is ringing this number back now to take the enquiry. If it works, a lead follows here. Only call yourself if none does.",
+    morning: "Vani will ring this number back at about 10am to take the enquiry. If it works, a lead follows here. Only call yourself if none does.",
+  };
   return [
-    "DROPPED CALL: please call back",
+    plan ? "DROPPED CALL: Vani is calling back" : "DROPPED CALL: please call back",
     line("Number", l.phone ?? "not captured"),
     `Call lasted ${Math.round(l.durationSeconds)}s with no qualifying details.`,
+    plan ? plans[plan] : null,
     line("Call", l.dashboardUrl),
+  ]
+    .filter((x) => x !== null)
+    .join("\n");
+}
+
+/** Vani's callback did not produce a lead, so a person has to ring this number. */
+export function callbackProblemMessage(l: Lead, kind: "failed" | "unanswered", detail?: string): string {
+  return [
+    kind === "failed" ? "VANI CALLBACK FAILED: please call back" : "VANI CALLBACK GOT NOTHING: please call back",
+    line("Number", l.phone ?? "not captured"),
+    kind === "failed"
+      ? line("What happened", detail ?? "Vani could not place the call.")
+      : "Vani rang back but could not take the enquiry (not picked up, or hung up straight away).",
+    line("Dropped call", l.dashboardUrl),
   ]
     .filter((x) => x !== null)
     .join("\n");

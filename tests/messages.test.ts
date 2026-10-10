@@ -122,3 +122,23 @@ describe("format helpers", () => {
     expect(initials(null, null)).toBe("?");
   });
 });
+
+import { callbackProblemMessage, droppedMessage } from "../src/lib/messages";
+describe("dropped call and callback alerts", () => {
+  const lead: Lead = { callId: "c1", phone: "9000000017", tier: "dropped", fields: null, summary: "", reasons: [], uncertain: [], askedAboutPrice: false, handleWithCare: null, repeatCaller: false, recordingUrl: null, durationSeconds: 12, dashboardUrl: "https://x/calls/c1" };
+  it("a plain dropped call asks someone to call back", () => {
+    expect(droppedMessage({ ...lead })).toMatch(/please call back/);
+  });
+  it("says Vani is ringing back, and when, so designers do not ring at the same moment", () => {
+    expect(droppedMessage({ ...lead }, "now")).toMatch(/Vani is ringing this number back now/);
+    expect(droppedMessage({ ...lead }, "morning")).toMatch(/about 10am/);
+    expect(droppedMessage({ ...lead }, "now")).not.toMatch(/please call back/);
+  });
+  it("a failed or empty callback asks a person to ring, with the number and the link", () => {
+    const failed = callbackProblemMessage({ ...lead }, "failed", "Vani could not start the call");
+    expect(failed).toMatch(/CALLBACK FAILED: please call back/);
+    expect(failed).toContain("9000000017");
+    expect(failed).toContain("https://x/calls/c1");
+    expect(callbackProblemMessage({ ...lead }, "unanswered")).toMatch(/GOT NOTHING/);
+  });
+});

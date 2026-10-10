@@ -5,11 +5,11 @@ import { runGemini } from "./scoring/gemini";
 import { decide } from "./scoring/decide";
 import { isDroppedCall } from "./scoring/dropped";
 import type { ScoreOutput } from "./scoring/schema";
-import { droppedMessage, escalationMessage, handoffMessage, reviewMessage } from "./messages";
+import { callbackProblemMessage, droppedMessage, escalationMessage, handoffMessage, reviewMessage, type CallbackPlan } from "./messages";
 import { sendTelegram } from "./integrations/telegram";
 import { createContactAndDeal } from "./integrations/hubspot";
 import { bookConsultation } from "./integrations/calcom";
-import { autoCallbackDropped } from "./auto-callback";
+import { autoCallbackDropped, autoCallbackEnabled } from "./auto-callback";
 import { callDateLabel, isOutsideHours } from "./time";
 import { modeFor, type ActionResult, type Lead, type Mode } from "./integrations/types";
 
@@ -173,7 +173,14 @@ export async function route(mode: Mode, lead: Lead, callId: string): Promise<Rou
   } else if (lead.tier === "escalate") {
     await record(await sendTelegram(mode, escalationMessage(lead), "escalation"));
   } else if (lead.tier === "dropped") {
-    await record(await sendTelegram(mode, droppedMessage(lead), "dropped_call"));
+    // A callback that itself got nothing is a different message from a first drop: a person now has to ring.
+    const [cb] = await query<{ callback_of: string | null }>("select callback_of from calls where id = $1", [callId]);
+    if (cb?.callback_of) {
+      await record(await sendTelegram(mode, callbackProblemMessage(lead, "unanswered"), "callback_unanswered"));
+    } else {
+      const plan: CallbackPlan = mode === "live" && lead.phone && autoCallbackEnabled() ? (isOutsideHours(new Date()) ? "morning" : "now") : null;
+      await record(await sendTelegram(mode, droppedMessage(lead, plan), "dropped_call"));
+    }
   }
   // red: logged for designer verification only; nothing leaves the system.
   return out;
