@@ -203,3 +203,21 @@ describe("booking happens after the call, not on it", () => {
     expect(prompt).not.toMatch(/cal\.com|calendar link|webhook|hubspot/i);
   });
 });
+
+describe("upset callers", () => {
+  const prompt = buildVaniPrompt();
+
+  it("has the calm, apologise-once, senior-callback rule", () => {
+    expect(prompt).toMatch(/# If the caller is upset or angry/);
+    expect(prompt).toMatch(/apologise once/i);
+    expect(prompt).toMatch(/never argue/i);
+    expect(prompt).toMatch(/senior person will call them back/i);
+  });
+
+  it("still has the exact pricing sentence and no money or tool names", () => {
+    expect(prompt).toContain(RULES.PRICING_ANSWER);
+    for (const r of MONEY) expect(prompt, String(r)).not.toMatch(r);
+    expect(prompt).not.toMatch(/\b(booked|confirmed)\b/i);
+    expect(prompt).not.toMatch(/cal\.com|webhook|hubspot|telegram/i);
+  });
+});
