@@ -117,7 +117,7 @@ describe("format helpers", () => {
   });
   it("builds avatar initials", () => {
     expect(initials("Priya Sharma")).toBe("PS");
-    expect(initials("Girish")).toBe("G");
+    expect(initials("Gopal")).toBe("G");
     expect(initials(null, "9000000101")).toBe("01");
     expect(initials(null, null)).toBe("?");
   });
