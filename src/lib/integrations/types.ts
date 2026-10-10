@@ -47,6 +47,8 @@ export async function fetchJson(url: string, init: RequestInit & { timeoutMs?: n
     } catch {
       /* non-JSON body */
     }
+    // Third-party JSON: its shape is checked where each field is read.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return { ok: res.ok, status: res.status, json: json as Record<string, any> | null, text };
   } finally {
     clearTimeout(t);

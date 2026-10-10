@@ -18,7 +18,7 @@ async function call(method: string, path: string, body?: unknown) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
-  let json: any = null;
+  let json: { agent_id?: string } | null = null;
   try { json = JSON.parse(text); } catch { /* not json */ }
   if (!res.ok) throw new Error(`${method} ${path} -> ${res.status} ${text.slice(0, 300)}`);
   return json;
@@ -36,7 +36,7 @@ async function main() {
 
   if (!agentId) {
     const created = await call("POST", "/create-agent", { agent_display_name: "Aangan Studio assistant" });
-    agentId = created.agent_id as string;
+    agentId = created?.agent_id as string;
     saveEnv("VANI_AGENT_ID", agentId);
     console.log("created agent", agentId);
   } else {

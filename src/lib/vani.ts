@@ -29,11 +29,12 @@ export function sign(rawBody: string, secret: string): string {
   return "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
 }
 
-type Json = Record<string, any>;
-const pick = (o: Json | undefined, ...keys: string[]) => {
+type Json = Record<string, unknown>;
+const pick = (o: Json | undefined, ...keys: string[]): unknown => {
   for (const k of keys) if (o && o[k] != null && o[k] !== "") return o[k];
   return undefined;
 };
+const obj = (v: unknown): Json | undefined => (v && typeof v === "object" && !Array.isArray(v) ? (v as Json) : undefined);
 
 /**
  * Vani sends the transcript as one string: "[13:33:14] AGENT: ...\n\n[13:33:19] USER: ...".
@@ -73,14 +74,14 @@ export function isFinalEvent(body: Json): boolean {
 
 /** Tolerant mapping of a Vani call_postprocessing event into VaniCall. */
 export function parseVaniPayload(body: Json): VaniCall {
-  const d: Json = body.data ?? body.call ?? body.payload ?? body;
+  const d: Json = obj(body.data) ?? obj(body.call) ?? obj(body.payload) ?? body;
   const callId = String(pick(d, "call_id", "callId", "room_name", "id") ?? pick(body, "call_id") ?? "") || null;
   const ts = pick(body, "timestamp") ?? pick(d, "started_at", "startedAt", "start_time", "created_at");
   let duration = Number(pick(d, "call_duration", "duration_seconds", "durationSeconds", "duration") ?? NaN);
   // call_postprocessing reports milliseconds; call_ended reports seconds. Calls over 3 hours in seconds are not plausible here.
   if (Number.isFinite(duration) && String(body.event ?? "") === "call_postprocessing") duration = duration / 1000;
   if (!Number.isFinite(duration)) duration = 0;
-  const when = ts ? new Date(ts) : new Date();
+  const when = typeof ts === "string" || typeof ts === "number" ? new Date(ts) : new Date();
   // The event fires after the call ends, so the call began `duration` earlier.
   const startedAt = new Date((Number.isNaN(when.getTime()) ? Date.now() : when.getTime()) - duration * 1000);
   const phone = pick(d, "phone_number", "from", "caller_number", "customer_number", "from_number");

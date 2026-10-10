@@ -49,6 +49,7 @@ export async function bookConsultation(mode: Mode, lead: Lead): Promise<BookingO
     });
 
   try {
+    let usedNearest = false;
     const attempts: string[] = [];
     if (preferredUtc && new Date(preferredUtc).getTime() > Date.now()) attempts.push(preferredUtc);
     let r = attempts.length ? await tryBook(attempts[0]) : null;
@@ -70,15 +71,15 @@ export async function bookConsultation(mode: Mode, lead: Lead): Promise<BookingO
         return { channel: "calcom", status: "failed", detail: { error: "no open slot found", slotsHttp: s.status, ...preview } };
       }
       r = await tryBook(new Date(starts[0]).toISOString());
-      if (r.ok) (r.json as Record<string, unknown>).usedNearestSlot = true;
+      usedNearest = true;
     }
     if (!r.ok) return { channel: "calcom", status: "failed", detail: { http: r.status, error: r.json?.error?.message ?? r.json?.message ?? r.text.slice(0, 200), ...preview } };
-    const data = (r.json?.data ?? {}) as Record<string, any>;
-    const start = data.start as string | undefined;
+    const data = (r.json?.data ?? {}) as { uid?: string; start?: string };
+    const start = data.start;
     return {
       channel: "calcom",
       status: "booked",
-      detail: { bookingUid: data.uid, start, nearestSlotUsed: Boolean((r.json as any)?.usedNearestSlot), ...preview },
+      detail: { bookingUid: data.uid, start, nearestSlotUsed: usedNearest, ...preview },
       externalId: data.uid ? String(data.uid) : undefined,
       startUtc: start,
     };

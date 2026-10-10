@@ -1,6 +1,6 @@
 import { RULES, type Tier } from "./rules";
 import { query } from "./db";
-import { geminiCostInr, voiceCostInr } from "./cost";
+import { voiceCostInr } from "./cost";
 import { runGemini } from "./scoring/gemini";
 import { decide } from "./scoring/decide";
 import { isDroppedCall } from "./scoring/dropped";

@@ -1,5 +1,6 @@
 import { query } from "./db";
-import { RULES } from "./rules";
+import { RULES, type Tier } from "./rules";
+import type { ScoreOutput } from "./scoring/schema";
 
 export type SourceFilter = "all" | "live" | "test";
 export type ListFilter = "all" | "verify" | "urgent" | "handed";
@@ -8,8 +9,58 @@ export interface CallListItem {
   id: string; source: "live" | "test"; fixture_id: string | null; caller_phone: string | null; started_at: string;
   duration_seconds: number; tier: string | null; status: string; outcome: string | null; review_status: string;
   fields: { name?: string | null; location?: string | null; scope?: string | null } | null;
-  flags: { asked_about_price?: boolean; handle_with_care?: string | null; repeat_caller?: boolean } | null;
+  flags: CallFlags | null;
   consultation_booked: boolean;
+}
+
+export interface CallFlags {
+  asked_about_price?: boolean;
+  handle_with_care?: string | null;
+  repeat_caller?: boolean;
+}
+
+/** One row of the calls table, as the detail page reads it. Numeric columns arrive as strings. */
+export interface CallRecord {
+  id: string;
+  source: "live" | "test";
+  vani_call_id: string | null;
+  fixture_id: string | null;
+  caller_phone: string | null;
+  started_at: string;
+  duration_seconds: number;
+  recording_url: string | null;
+  transcript: string | null;
+  tier: Tier | null;
+  ai_tier: string | null;
+  status: string;
+  outcome: string | null;
+  review_status: string;
+  fields: ScoreOutput["fields"] | null;
+  criteria: Record<string, { status: string; reason: string }> | null;
+  reasons: string[] | null;
+  uncertain: string[] | null;
+  flags: CallFlags | null;
+  handoff_summary: string | null;
+  consultation_booked: boolean;
+  consultation_at: string | null;
+  voice_cost_inr: string;
+  ai_cost_inr: string;
+  error: string | null;
+}
+
+export interface ActionRecord {
+  id: string;
+  channel: "hubspot" | "telegram" | "calcom";
+  status: "sent" | "booked" | "skipped_test" | "dry_run" | "failed";
+  detail: Record<string, unknown> | null;
+  external_id: string | null;
+}
+
+export interface AiRunRecord {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost_inr: string;
 }
 
 const srcClause = (s: SourceFilter, n = 1) => (s === "all" ? { sql: "true", params: [] as unknown[] } : { sql: `source = $${n}`, params: [s] });
@@ -43,10 +94,10 @@ export async function filterCounts(source: SourceFilter) {
 
 export async function getCall(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-  const rows = await query<Record<string, any>>("select * from calls where id = $1", [id]);
+  const rows = await query<CallRecord>("select * from calls where id = $1", [id]);
   if (!rows[0]) return null;
-  const actions = await query<Record<string, any>>("select * from actions where call_id = $1 order by created_at", [id]);
-  const runs = await query<Record<string, any>>("select * from ai_runs where call_id = $1 order by created_at", [id]);
+  const actions = await query<ActionRecord>("select * from actions where call_id = $1 order by created_at", [id]);
+  const runs = await query<AiRunRecord>("select * from ai_runs where call_id = $1 order by created_at", [id]);
   return { call: rows[0], actions, runs };
 }
 

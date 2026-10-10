@@ -25,7 +25,11 @@ async function main() {
   // Sequential so repeat-caller detection (T17a before T17) is stable.
   await Promise.all(CASES.map((c) => processCall(ids[c.id])));
 
-  const rows = await query<Record<string, any>>(
+  interface EvalRow {
+    fixture_id: string; tier: string | null; flags: { asked_about_price?: boolean; handle_with_care?: string | null } | null;
+    uncertain: string[] | null; status: string; error: string | null; ai_cost_inr: string;
+  }
+  const rows = await query<EvalRow>(
     "select fixture_id, tier, expected_tier, flags, uncertain, status, error, ai_cost_inr, voice_cost_inr from calls where source = 'test' and fixture_id is not null order by fixture_id",
   );
   let pass = 0;
