@@ -39,7 +39,7 @@ describe("whyLine", () => {
 
   it("falls back to rule checks when there is nothing else, and caps the length", () => {
     expect(whyLine(["Rule check: area: met (Baner is in the service area)"])).toBe("area: met (Baner is in the service area)");
-    expect(whyLine(["x".repeat(400)]).length).toBeLessThanOrEqual(220);
+    expect(whyLine(["x".repeat(400)]).length).toBeLessThanOrEqual(160);
     expect(whyLine([])).toBe("");
   });
 });

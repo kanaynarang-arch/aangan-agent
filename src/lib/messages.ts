@@ -4,7 +4,7 @@ import type { Lead } from "./integrations/types";
 const line = (label: string, v: unknown) => (v == null || v === "" ? null : `${label}: ${v}`);
 
 /** One short line built from the stored rubric reasons: at most three, rule-check overrides only if nothing else. */
-export function whyLine(reasons: string[], max = 3, limit = 220): string {
+export function whyLine(reasons: string[], max = 3, limit = 160): string {
   const clean = (r: string) => r.replace(/^Rule check:\s*/i, "").replace(/\s+/g, " ").trim().replace(/[.\s]+$/, "");
   const main = reasons.filter((r) => !/^Rule check:/i.test(r)).map(clean).filter(Boolean);
   const picks = (main.length ? main : reasons.map(clean).filter(Boolean)).slice(0, max);
