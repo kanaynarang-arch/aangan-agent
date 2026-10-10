@@ -86,7 +86,7 @@ Open the agent in the Vani dashboard and press Start Test (Audio mode). With `TR
 
 ## Live test, 10 October
 
-A Vani browser call (Audio mode) through the deployed site: scored Green, HubSpot contact and deal created, Telegram handoff posted, the price question answered with no figure. Three other calls (green with a price question, an existing-client complaint, an amber lead and a dropped call) were sent to the live webhook as clearly labelled SELFTEST calls and routed correctly, including a Cal.com booking. The live test found two real bugs, both fixed and recorded in `DECISIONS.md` (77 and 78): Vani omits the call length for browser calls, and Cal.com refuses a made-up attendee email. Not yet exercised: the callback to a real phone and the Approve button on live data.
+A Vani browser call (Audio mode) through the deployed site: scored Green, HubSpot contact and deal created, Telegram handoff posted, the price question answered with no figure. Four more calls (a green lead with a price question, an existing-client complaint, an amber lead and a dropped call) were sent to the live webhook as clearly labelled SELFTEST calls and routed correctly, including a Cal.com booking. The live test found two real bugs, both fixed and recorded in `DECISIONS.md` (77 and 78): Vani omits the call length for browser calls, and Cal.com refuses a made-up attendee email. Not yet exercised: the callback to a real phone and the Approve button on live data.
 
 ## Test results
 
