@@ -46,6 +46,27 @@ export default async function Pipeline({ searchParams }: { searchParams: Promise
         <div className="panel kpi"><div className="n">{green ? inr(m.total / green) : "-"}</div><div className="l">Cost per lead handed over{green ? "" : " (no leads yet)"}</div></div>
       </div>
 
+      <h2>From call to consultation</h2>
+      <div className="panel">
+        <ol className="funnel">
+          <li>
+            <div className="what"><b>{m.received}</b><span>Calls answered</span></div>
+            <div className="track" aria-hidden="true"><div className="fill" style={{ width: "100%", background: "var(--accent)" }} /></div>
+            <div className="conv">{pct(m.answered5, m.received)} answered within 5 minutes</div>
+          </li>
+          <li>
+            <div className="what"><b>{green}</b><span>Became a lead for a designer</span></div>
+            <div className="track" aria-hidden="true"><div className="fill" style={{ width: `${m.received ? Math.max(2, (green / m.received) * 100) : 0}%`, background: "var(--green)" }} /></div>
+            <div className="conv">{pct(green, m.received)} of calls</div>
+          </li>
+          <li>
+            <div className="what"><b>{m.booked}</b><span>Consultations booked</span></div>
+            <div className="track" aria-hidden="true"><div className="fill" style={{ width: `${m.received ? Math.max(m.booked ? 2 : 0, (m.booked / m.received) * 100) : 0}%`, background: "var(--green)", opacity: 0.7 }} /></div>
+            <div className="conv">{pct(m.booked, green)} of leads</div>
+          </li>
+        </ol>
+      </div>
+
       <h2>Calls by tier</h2>
       <div className="panel">
         <div className="bar" role="img" aria-label={`Calls by tier: ${TIERS.map((t) => `${m.tiers[t.key] ?? 0} ${t.label}`).join(", ")}`}>
@@ -53,7 +74,7 @@ export default async function Pipeline({ searchParams }: { searchParams: Promise
         </div>
         <div className="legend">
           {TIERS.map((t) => (
-            <div key={t.key}><span style={{ color: t.color }} aria-hidden="true">●</span> {t.label}<div className="v">{m.tiers[t.key] ?? 0}</div></div>
+            <div key={t.key}><span style={{ color: t.color }} aria-hidden="true">●</span> {t.label}<div className="v">{m.tiers[t.key] ?? 0}<span className="muted small"> {pct(m.tiers[t.key] ?? 0, tierTotal)}</span></div></div>
           ))}
         </div>
         {(m.tiers.pending ?? 0) > 0 && <p className="note">{m.tiers.pending} call(s) still being scored.</p>}
