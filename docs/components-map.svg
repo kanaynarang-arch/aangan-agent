@@ -51,7 +51,7 @@
 <text class="cap" x="1128" y="106" font-family="system-ui,sans-serif" font-size="13.5" fill="#1f1b16">Green: HubSpot, Cal.com,</text>
 <text class="cap" x="1128" y="128" font-family="system-ui,sans-serif" font-size="13.5" fill="#1f1b16">Telegram note</text>
 <text class="cap" x="1128" y="150" font-family="system-ui,sans-serif" font-size="13.5" fill="#1f1b16">Amber, Red: verify queue</text>
-<text class="cap" x="1128" y="172" font-family="system-ui,sans-serif" font-size="13.5" fill="#1f1b16">Escalate, dropped:</text>
-<text class="cap" x="1128" y="194" font-family="system-ui,sans-serif" font-size="13.5" fill="#1f1b16">Telegram alert</text>
+<text class="cap" x="1128" y="172" font-family="system-ui,sans-serif" font-size="13.5" fill="#1f1b16">Escalate: Telegram alert</text>
+<text class="cap" x="1128" y="194" font-family="system-ui,sans-serif" font-size="13.5" fill="#1f1b16">Dropped: Vani calls back</text>
 <text class="cap" x="1128" y="216" font-family="system-ui,sans-serif" font-size="13.5" fill="#1f1b16">All: dashboard</text>
 </svg>

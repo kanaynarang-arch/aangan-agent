@@ -16,9 +16,20 @@ An AI phone agent and dashboard for Aangan Studio, a Pune interior design studio
 | **Amber** | 1, 2 or 3 unclear, or timeline fails but a later start works | Designer verify queue and a Telegram note marked "needs review" |
 | **Red** | Clearly fails 1, 2 or 3, fails two or more, or a volunteered budget is clearly too low | Caller was closed politely on the call; logged in the verify queue for a designer to check. Nothing goes to HubSpot |
 | **Escalate** | Existing client complaint | Skips scoring. Urgent Telegram alert for a senior callback within 15 minutes |
-| **Dropped** | Very short call, no details | Logged, Telegram alert with the number so someone calls back |
+| **Dropped** | Very short call, no details | Logged, and a Telegram alert with the number. Vani rings the caller back to take the enquiry (see Callbacks), and a person is asked to call only if that fails |
 
 4. **Dashboard** (no login): a designer view (call list, transcript, extracted fields, tier, status, verify queue with Approve and Drop) and a pipeline view for the founder (calls received, share answered within 5 minutes, calls outside 10am to 7pm, counts by tier, consultations booked, run cost in rupees per call and per month).
+
+## Callbacks: turning a dropped call into a lead
+
+A call that drops before any details were captured has no lead. Vani can ring the caller back and take the enquiry itself:
+
+- **Automatic.** With `VANI_PHONE_CALLBACKS=true` and `AUTO_CALLBACK_DROPPED=true`, a dropped live call is rung back once by itself: at once between 10am and 7pm India time, otherwise in a morning sweep (Vercel Cron, `/api/cron/callbacks`, guarded by `CRON_SECRET`). It skips callers who phoned again, and the national Do Not Disturb check stays on.
+- **By hand.** The call page of a dropped call has a "Callback by Vani" card. For a live call it rings the caller after a confirm step.
+- **What it produces.** The callback conversation becomes a new call linked to the dropped one, scored and routed like any enquiry (green goes to HubSpot, Cal.com and Telegram). It is tagged "From a callback" and left out of the speed figures.
+- **When it fails.** If Vani cannot place the call, or nobody gives any details, Telegram says "VANI CALLBACK FAILED" or "VANI CALLBACK GOT NOTHING" with the number, so a person rings.
+- **Sample calls.** They have made-up numbers, so nobody is rung. The call page offers a browser demo instead: you answer as the caller, and it creates a test lead.
+- **Never called back:** existing clients with a complaint (a senior person calls those), leads that already exist, closed enquiries, and callbacks themselves. A callback session is capped at 4 minutes and the dashboard at 20 callbacks a day.
 
 ## Architecture
 
@@ -61,9 +72,9 @@ npm run dev                   # http://localhost:3000
 | Neon | Postgres: calls, AI runs, integration actions | `DATABASE_URL` |
 | HubSpot | Contact and deal for green leads | `HUBSPOT_TOKEN` |
 | Telegram | Handoff notes, review requests, urgent alerts, callbacks | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
-| Cal.com | Consultation booking from the caller's preferred time | `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID` |
+| Cal.com | Consultation booking from the caller's preferred time | `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID`, `CALCOM_ATTENDEE_EMAIL` |
 
-Only live calls are sent to HubSpot, Telegram or Cal.com. A real phone call is live by default. `LIVE_INTEGRATIONS=true` switches the integrations on, and `TREAT_WEB_CALLS_AS_LIVE=true` makes Vani web (WebRTC) test calls count as live too, so the full path can be checked end to end without a phone number. With the flag off, web calls stay test data. The deployed project currently has it on for the end-to-end check; set it back to `false` when you only want test calls.
+Cal.com checks that an attendee email can receive mail and callers are never asked for one, so each booking uses a plus-address of `CALCOM_ATTENDEE_EMAIL` (the studio's own address). Only live calls are sent to HubSpot, Telegram or Cal.com. A real phone call is live by default. `LIVE_INTEGRATIONS=true` switches the integrations on, and `TREAT_WEB_CALLS_AS_LIVE=true` makes Vani web (WebRTC) test calls count as live too, so the full path can be checked end to end without a phone number. With the flag off, web calls stay test data. The deployed project currently has it on for the end-to-end check; set it back to `false` when you only want test calls.
 
 ## Vani setup
 
@@ -72,6 +83,10 @@ Only live calls are sent to HubSpot, Telegram or Cal.com. A real phone call is l
 ## Testing with a Vani web call
 
 Open the agent in the Vani dashboard and press Start Test (Audio mode). With `TREAT_WEB_CALLS_AS_LIVE=true`, which is how the deployment is currently set, the call is stored as `source='live'`: it is scored, shown on the dashboard, and a green lead is sent to HubSpot, Telegram and Cal.com. With the flag off it is stored as `source='test'` and the call page shows what would have been sent. Vani's Chat mode is cheaper (about 1.30 rupees for 1 minute 43 seconds) but does not fire the webhook and keeps no transcript, so only Audio mode exercises the full path.
+
+## Live test, 10 October
+
+A Vani browser call (Audio mode) through the deployed site: scored Green, HubSpot contact and deal created, Telegram handoff posted, the price question answered with no figure. Three other calls (green with a price question, an existing-client complaint, an amber lead and a dropped call) were sent to the live webhook as clearly labelled SELFTEST calls and routed correctly, including a Cal.com booking. The live test found two real bugs, both fixed and recorded in `DECISIONS.md` (77 and 78): Vani omits the call length for browser calls, and Cal.com refuses a made-up attendee email. Not yet exercised: the callback to a real phone and the Approve button on live data.
 
 ## Test results
 
