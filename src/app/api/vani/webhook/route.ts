@@ -32,6 +32,8 @@ export async function POST(req: Request) {
   if (!isFinalEvent(body)) return Response.json({ ok: true, ignored: body.event });
 
   const call = parseVaniPayload(body);
+  // Field names only, never values: helps spot a payload shape we do not read yet.
+  console.log("vani event", String(body.event ?? ""), Object.keys(body).join(","), "| data:", Object.keys((body.data as object) ?? {}).join(","), "| duration:", call.durationSeconds);
 
   // A callback started from the dashboard: keep the recording against the dropped call, and turn the conversation into a lead.
   if (call.vaniCallId) {

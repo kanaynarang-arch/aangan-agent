@@ -121,6 +121,9 @@ describe("tier logic", () => {
 describe("dropped calls and costs", () => {
   it("flags empty, very short and wordless calls", () => {
     expect(isDroppedCall(null, 0)).toBe(true);
+    // Unknown length (0) with a real conversation is not a dropped call.
+    expect(isDroppedCall(CASES.find((c) => c.id === "T01")!.transcript, 0)).toBe(false);
+    expect(isDroppedCall("Agent: hi\nCaller: hi", 0)).toBe(true);
     expect(isDroppedCall("Caller: hello", 20)).toBe(true);
     expect(isDroppedCall("Agent: hi\nCaller: Hi I wanted to enquire about", 72)).toBe(true);
     expect(isDroppedCall(CASES.find((c) => c.id === "T01")!.transcript, 250)).toBe(false);
@@ -219,5 +222,17 @@ describe("upset callers", () => {
     for (const r of MONEY) expect(prompt, String(r)).not.toMatch(r);
     expect(prompt).not.toMatch(/\b(booked|confirmed)\b/i);
     expect(prompt).not.toMatch(/cal\.com|webhook|hubspot|telegram/i);
+  });
+});
+
+import { durationFromTranscript } from "../src/lib/vani";
+describe("call length when Vani omits it", () => {
+  it("uses the time stamps in the transcript", () => {
+    expect(durationFromTranscript("[13:29:00] AGENT: Hello\n\n[13:31:40] USER: Bye")).toBe(165);
+  });
+  it("estimates from the words spoken when there are no time stamps, and says 0 when there is too little", () => {
+    expect(durationFromTranscript(Array(100).fill("word").join(" "))).toBe(50);
+    expect(durationFromTranscript("Agent: hi\nCaller: hello")).toBe(0);
+    expect(durationFromTranscript(null)).toBe(0);
   });
 });

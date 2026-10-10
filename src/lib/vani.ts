@@ -66,6 +66,22 @@ export function transcriptToText(t: unknown): string | null {
   return lines.length ? lines.join("\n") : null;
 }
 
+/**
+ * Length of a call worked out from its transcript, for payloads that omit it. Uses the "[13:29:00]" time stamps when present,
+ * otherwise estimates from the number of words spoken (about 2 words a second including pauses). Zero when there is nothing to go on.
+ */
+export function durationFromTranscript(t: unknown): number {
+  const text = typeof t === "string" ? t : Array.isArray(t) ? t.map((m) => String(pick(m as Json, "text", "content", "message", "transcript") ?? "")).join("\n") : "";
+  if (!text) return 0;
+  const stamps = [...text.matchAll(/\[(\d{2}):(\d{2}):(\d{2})\]/g)].map((m) => +m[1] * 3600 + +m[2] * 60 + +m[3]);
+  if (stamps.length >= 2) {
+    const span = (stamps[stamps.length - 1] - stamps[0] + 86400) % 86400;
+    return span + 5; // the last line is followed by a few seconds of speech
+  }
+  const words = text.replace(/\[[^\]]*\]/g, " ").split(/\s+/).filter((w) => w && !/^(agent|caller|user):?$/i.test(w)).length;
+  return words >= 20 ? Math.round(words / 2) : 0;
+}
+
 /** Events other than call_postprocessing carry no transcript; the route acknowledges and ignores them. */
 export function isFinalEvent(body: Json): boolean {
   const ev = String(body.event ?? "").toLowerCase();
@@ -81,6 +97,12 @@ export function parseVaniPayload(body: Json): VaniCall {
   // call_postprocessing reports milliseconds; call_ended reports seconds. Calls over 3 hours in seconds are not plausible here.
   if (Number.isFinite(duration) && String(body.event ?? "") === "call_postprocessing") duration = duration / 1000;
   if (!Number.isFinite(duration)) duration = 0;
+  // Browser (WebRTC) calls do not always carry the length in the field above, so fall back to other names, then to the transcript.
+  if (!duration) {
+    const ms = Number(pick(d, "duration_ms", "call_duration_ms", "durationMs") ?? NaN);
+    if (Number.isFinite(ms) && ms > 0) duration = ms / 1000;
+  }
+  if (!duration) duration = durationFromTranscript(pick(d, "transcript", "messages", "conversation"));
   const when = typeof ts === "string" || typeof ts === "number" ? new Date(ts) : new Date();
   // The event fires after the call ends, so the call began `duration` earlier.
   const startedAt = new Date((Number.isNaN(when.getTime()) ? Date.now() : when.getTime()) - duration * 1000);

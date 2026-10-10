@@ -16,6 +16,7 @@ export function callerWordCount(transcript: string | null): number {
 /** Very short call, or nothing said that qualifies. No AI call is spent on these. */
 export function isDroppedCall(transcript: string | null, durationSeconds: number): boolean {
   if (!transcript || transcript.trim().length === 0) return true;
-  if (durationSeconds < RULES.DROPPED_MAX_SECONDS) return true;
+  // A length of 0 means unknown (some payloads omit it), so judge by what was said instead.
+  if (durationSeconds > 0 && durationSeconds < RULES.DROPPED_MAX_SECONDS) return true;
   return callerWordCount(transcript) < RULES.DROPPED_MIN_CALLER_WORDS;
 }
