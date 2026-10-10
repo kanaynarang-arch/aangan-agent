@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Icon } from "@/components/Icon";
 
 /** Copies the Telegram handoff text so a designer can paste it anywhere. */
 export function CopyNote({ text }: { text: string }) {
@@ -34,7 +35,7 @@ export function CopyNote({ text }: { text: string }) {
   return (
     <div>
       <div className="btns" style={{ marginTop: 0, alignItems: "center" }}>
-        <button type="button" className="b" onClick={copy}>Copy handoff note</button>
+        <button type="button" className="b" onClick={copy}><Icon name="copy" />Copy handoff note</button>
         <span role="status" aria-live="polite" className="small">
           {state === "copied" && "Copied. Paste it anywhere."}
           {state === "error" && "Could not copy. Open the preview and copy it by hand."}

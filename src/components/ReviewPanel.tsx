@@ -14,7 +14,7 @@ export function ReviewPanel({ id, pending, tier, decided }: { id: string; pendin
   const showForm = pending && state.status !== "ok";
 
   return (
-    <section className="panel" style={{ borderColor: "var(--amber)", borderWidth: 2, margin: "var(--s-4) 0" }} aria-label="Designer decision">
+    <section className="card decision" aria-label="Designer decision">
       {showForm && (
         <>
           <h2>{tier === "red" ? "Check before this is dropped" : "Needs your decision"}</h2>
