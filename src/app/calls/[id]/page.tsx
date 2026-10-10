@@ -138,12 +138,16 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
           <h2>Founder&apos;s rubric</h2>
           {c.criteria && c.tier !== "escalate" ? (
             <dl className="kv">
-              {Object.entries(c.criteria).map(([k, v]) => (
-                <div key={k} style={{ display: "contents" }}>
-                  <dt>{CRIT[k] ?? k}</dt>
-                  <dd><b style={{ color: STATUS_COLOR[v.status] }}>{STATUS_WORD[v.status] ?? v.status}</b> <span className="muted small">{v.reason}</span></dd>
-                </div>
-              ))}
+              {/* Postgres returns JSON keys in its own order, so list the five criteria in rubric order. */}
+              {Object.keys(CRIT).filter((k) => c.criteria?.[k]).map((k) => {
+                const v = c.criteria![k];
+                return (
+                  <div key={k} style={{ display: "contents" }}>
+                    <dt>{CRIT[k]}</dt>
+                    <dd><b style={{ color: STATUS_COLOR[v.status] }}>{STATUS_WORD[v.status] ?? v.status}</b> <span className="muted small">{v.reason}</span></dd>
+                  </div>
+                );
+              })}
             </dl>
           ) : (
             <p className="muted">Not scored: {c.tier === "escalate" ? "an existing-client complaint skips scoring" : "there was nothing to score"}.</p>
