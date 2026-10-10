@@ -113,11 +113,6 @@ export async function listCalls(filter: ListFilter, source: SourceFilter, opts: 
 }
 
 /** How many live (non-test) calls exist. Decides the Pipeline view's default. */
-export async function liveCallCount(): Promise<number> {
-  const r = await query<{ n: string }>("select count(*) as n from calls where source = 'live'");
-  return Number(r[0]?.n ?? 0);
-}
-
 export async function filterCounts(source: SourceFilter) {
   const src = srcClause(source);
   const r = await query<{ all: string; verify: string; urgent: string; handed: string }>(

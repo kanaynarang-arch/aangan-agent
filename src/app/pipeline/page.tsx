@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { dailyCalls, hourlyCalls, liveCallCount, pipelineMetrics, standupSummary, type StandupLead } from "@/lib/queries";
+import { dailyCalls, hourlyCalls, pipelineMetrics, standupSummary, type StandupLead } from "@/lib/queries";
 import { initials } from "@/lib/format";
 import { Icon } from "@/components/Icon";
 import { Sparkline } from "@/components/charts/Sparkline";
@@ -30,8 +30,8 @@ function statusWord(l: StandupLead): string {
 
 export default async function Pipeline({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const chosen = parseSource((await searchParams).source);
-  // Nikhil's numbers are about real calls: default to live as soon as one exists, otherwise show everything.
-  const source = chosen ?? ((await liveCallCount()) > 0 ? "live" : "all");
+  // Opens on everything so the full picture shows from the first visit. Nikhil's real-calls-only numbers are one click away on "Live".
+  const source = chosen ?? "all";
   const [m, day, hours, days] = await Promise.all([pipelineMetrics(source), standupSummary(source), hourlyCalls(source), dailyCalls(source, 30)]);
   const tierTotal = TIERS.reduce((n, t) => n + (m.tiers[t.key] ?? 0), 0);
   const green = m.tiers.green ?? 0;
