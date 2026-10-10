@@ -13,7 +13,7 @@
 - [x] GitHub repo (public) and push
 - [x] Vercel project, env vars, deploy, no-login dashboard, signed webhook test (bad signature 401, good 200, duplicate ignored, non-final ignored)
 - [x] Vani agent created via API, webhook registered, connectivity test accepted
-- [x] README, components map, DECISIONS
+- [x] README, DECISIONS (the components map is submitted separately)
 - [x] One live Vani web test call (10 Oct): Green, HubSpot and Telegram written; found and fixed the missing call length and the Cal.com email
 - [x] First live HubSpot / Cal.com / Telegram write (HubSpot and Telegram from the live call, Cal.com from the follow-up SELFTEST call)
 - [x] Dashboard redesign: app shell, grouped inbox, charts, conversation transcript

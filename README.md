@@ -2,8 +2,6 @@
 
 An AI phone agent and dashboard for Aangan Studio, a Pune interior design studio. It answers every incoming enquiry call within seconds, at any hour, asks the founder's five questions one at a time, scores the call against his rubric, and hands good leads to a designer with everything already asked.
 
-![Components map](docs/components-map.svg)
-
 ## What it does
 
 1. A caller dials the studio number. A **Vani** voice agent answers (English and Hindi), introduces itself as Aangan Studio's assistant, and captures: name, phone, residential or commercial, location, carpet area, scope, timeline, who decides, and a preferred consultation slot. It never asks about budget and never quotes a price.
