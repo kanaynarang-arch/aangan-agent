@@ -5,6 +5,7 @@ import { getCall, type ActionRecord, type CallRecord } from "@/lib/queries";
 import { dashboardUrl } from "@/lib/pipeline";
 import { noteForLead } from "@/lib/messages";
 import type { Lead } from "@/lib/integrations/types";
+import { captureSummary } from "@/lib/capture";
 import { CopyNote } from "@/components/CopyNote";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { TierBadge, actionWords, duration, formatPhone, inr, telHref, whenFull } from "@/components/ui";
@@ -15,7 +16,7 @@ export const metadata: Metadata = { title: "Call detail" };
 const CRIT: Record<string, string> = {
   real_project: "1. Real project", service_area: "2. Service area", timeline: "3. Timeline", budget: "4. Budget", decision_maker: "5. Decision-maker",
 };
-const STATUS_WORD: Record<string, string> = { met: "Met", unclear: "Unclear", failed: "Failed" };
+const STATUS_WORD: Record<string, string> = { met: "✓ Met", unclear: "? Unclear", failed: "✕ Failed" };
 const STATUS_COLOR: Record<string, string> = { met: "var(--green)", unclear: "var(--amber)", failed: "var(--red)" };
 const TIER_NOUN: Record<string, string> = { green: "green", amber: "amber", red: "red", escalate: "escalated", dropped: "dropped" };
 
@@ -95,14 +96,8 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
   const note = scored ? noteForLead(leadFrom(c), booking.note) : null;
   const name = f?.name ?? c.caller_phone ?? "Unknown caller";
   const steps = stepsFor(c, actions, booking.text);
+  const cap = scored && c.tier !== "escalate" && c.tier !== "dropped" ? captureSummary(f, c.caller_phone) : null;
 
-  const fieldRows: [string, string | null][] = [
-    ["Name", f?.name ?? null], ["Phone", c.caller_phone ?? f?.phone ?? null], ["Project type", f?.project_type ?? null], ["Space", f?.business_type ?? null],
-    ["Location", f?.location ?? null], ["Carpet area", f?.carpet_area_sqft ? `${f.carpet_area_sqft.toLocaleString("en-IN")} sq ft` : null],
-    ["Scope", f?.scope ?? null], ["Timeline", f?.timeline ?? null], ["Decision-maker", f?.decision_maker ?? null],
-    ["Preferred consultation", f?.preferred_consultation ?? null], ["Asked about price", f ? (f.asked_about_price ? "Yes" : "No") : null],
-    ["Volunteered budget", f?.volunteered_budget ?? null],
-  ];
   const decided = c.review_status === "approved" ? "approved and handed off" : c.review_status === "dropped" ? "dropped" : null;
 
   return (
@@ -171,16 +166,32 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
       )}
 
       <div className="two">
-        <section className="panel" aria-label="Extracted fields">
-          <h2>What the caller told us</h2>
-          <dl className="kv">
-            {fieldRows.map(([k, v]) => (
-              <div key={k} style={{ display: "contents" }}>
-                <dt>{k}</dt>
-                <dd>{v ? v : <span className="muted">Not captured</span>}</dd>
-              </div>
-            ))}
-          </dl>
+        <section className="panel" aria-label="First call preparation">
+          <h2>Before your first call</h2>
+          {scored && cap ? (
+            <>
+              <p className="small muted" style={{ margin: 0 }}>{cap.answered} of {cap.total} questions were already answered on the call, so there is no need to ask them again.</p>
+              <div className="meter" role="img" aria-label={`${cap.answered} of ${cap.total} answered`}><i style={{ width: `${(cap.answered / cap.total) * 100}%` }} /></div>
+              <h3 style={{ marginTop: 0 }}>Already asked</h3>
+              <ul className="asked">
+                {cap.asked.map((a) => (
+                  <li key={a.label}><span className="tick" aria-hidden="true">✓</span><span><small>{a.label}</small>{a.value}</span></li>
+                ))}
+                {cap.asked.length === 0 && <li className="muted">Nothing was captured on this call.</li>}
+              </ul>
+              {cap.toCover.length > 0 && (
+                <>
+                  <h3>Still to cover</h3>
+                  <ul className="asked">
+                    {cap.toCover.map((t) => <li key={t}><span className="todo" aria-hidden="true">•</span><span>{t}</span></li>)}
+                  </ul>
+                </>
+              )}
+              {f?.volunteered_budget && <p className="small muted">The caller mentioned a budget: {f.volunteered_budget}. The agent never asks for one.</p>}
+            </>
+          ) : (
+            <p className="muted">{c.tier === "escalate" ? "This is an existing client who is unhappy, not a new enquiry. Call them back, and do not ask enquiry questions." : "Nothing to prepare: this call was not scored as an enquiry."}</p>
+          )}
         </section>
 
         <section className="panel" aria-label="Rubric">

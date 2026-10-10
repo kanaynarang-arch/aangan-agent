@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { filterCounts, listCalls, TIER_OPTIONS, type ListFilter, type TierOption } from "@/lib/queries";
+import { captureSummary } from "@/lib/capture";
 import { TierBadge, SourceChips, duration, formatPhone, href, parseSource, telHref, when } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -105,6 +106,7 @@ export default async function DesignerView({ searchParams }: { searchParams: Pro
                       {c.flags?.asked_about_price && <span className="tag flag">Asked price</span>}
                       {c.flags?.handle_with_care && <span className="tag flag">Handle with care</span>}
                       {c.flags?.repeat_caller && <span className="tag">Repeat caller</span>}
+                      {c.outside_hours && <span className="tag" title="Came in outside 10am to 7pm, when the front desk is closed">After hours</span>}
                     </div>
                     {c.caller_phone && (c.source === "live" && telHref(c.caller_phone)
                       ? <div className="small num"><a className="calllink" href={telHref(c.caller_phone)!} aria-label={`Call ${formatPhone(c.caller_phone)}`}>{formatPhone(c.caller_phone)}</a></div>
@@ -119,7 +121,13 @@ export default async function DesignerView({ searchParams }: { searchParams: Pro
                     {c.review_status === "pending" && <div>Waiting for a designer</div>}
                     {c.consultation_booked && <div className="muted">Consultation booked</div>}
                   </td>
-                  <td data-label="Project" className="small">{[c.fields?.scope, c.fields?.location].filter(Boolean).join(" · ") || <span className="muted">Not captured</span>}</td>
+                  <td data-label="Project" className="small">
+                    {[c.fields?.scope, c.fields?.location].filter(Boolean).join(" · ") || <span className="muted">Not captured</span>}
+                    {c.fields && c.status === "processed" && (c.tier === "green" || c.tier === "amber" || c.tier === "red") && (() => {
+                      const cap = captureSummary(c.fields, c.caller_phone);
+                      return <div className="muted xs">{cap.answered} of {cap.total} questions already answered</div>;
+                    })()}
+                  </td>
                   <td data-label="Duration" className="small num nowrap">{duration(c.duration_seconds)}</td>
                 </tr>
               ))}
