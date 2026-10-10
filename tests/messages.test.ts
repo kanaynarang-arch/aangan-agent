@@ -103,3 +103,22 @@ describe("call back links", () => {
     expect(formatPhone("+14155550123")).toBe("+14155550123");
   });
 });
+
+import { ago, initials } from "../src/lib/format";
+
+describe("format helpers", () => {
+  const now = new Date("2026-10-10T12:00:00+05:30");
+  it("says how long ago in plain words", () => {
+    expect(ago("2026-10-10T11:59:40+05:30", now)).toBe("just now");
+    expect(ago("2026-10-10T11:48:00+05:30", now)).toBe("12 min ago");
+    expect(ago("2026-10-10T09:00:00+05:30", now)).toBe("3 h ago");
+    expect(ago("2026-10-09T11:00:00+05:30", now)).toBe("yesterday");
+    expect(ago("2026-09-25T09:15:00+05:30", now)).toBe("25 Sept");
+  });
+  it("builds avatar initials", () => {
+    expect(initials("Priya Sharma")).toBe("PS");
+    expect(initials("Girish")).toBe("G");
+    expect(initials(null, "9000000101")).toBe("01");
+    expect(initials(null, null)).toBe("?");
+  });
+});

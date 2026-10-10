@@ -43,6 +43,7 @@ export interface CallRecord {
   flags: CallFlags | null;
   handoff_summary: string | null;
   consultation_booked: boolean;
+  outside_hours: boolean;
   consultation_at: string | null;
   voice_cost_inr: string;
   ai_cost_inr: string;
@@ -184,4 +185,43 @@ export async function standupSummary(source: SourceFilter) {
      from calls where started_at > now() - interval '24 hours' and tier in ('green','amber','escalate') and ${src.sql}
      order by started_at desc limit 8`, src.params);
   return { calls: +t.calls, leads: +t.leads, waiting: +t.waiting, urgent: +t.urgent, booked: +t.booked, afterHours: +t.after_hours, recent };
+}
+
+/** Leads waiting for a designer, for the sidebar badge. Never throws: the badge is a convenience. */
+export async function navCounts(): Promise<{ waiting: number }> {
+  try {
+    const r = await query<{ n: string }>("select count(*) as n from calls where review_status = 'pending' or tier in ('escalate')");
+    return { waiting: Number(r[0]?.n ?? 0) };
+  } catch {
+    return { waiting: 0 };
+  }
+}
+
+/** Calls by hour of day in India time, split into leads and other calls. */
+export async function hourlyCalls(source: SourceFilter) {
+  const src = srcClause(source);
+  const rows = await query<{ h: number; calls: string; leads: string }>(
+    `select extract(hour from started_at at time zone '${RULES.TIME_ZONE}')::int as h, count(*) as calls,
+       count(*) filter (where tier = 'green') as leads
+     from calls where ${src.sql} group by 1 order by 1`, src.params);
+  const byHour = new Map(rows.map((r) => [r.h, r]));
+  return Array.from({ length: 24 }, (_, h) => ({ hour: h, calls: Number(byHour.get(h)?.calls ?? 0), leads: Number(byHour.get(h)?.leads ?? 0) }));
+}
+
+/** Calls per day (India time) for the last `days` days, with zero-filled gaps. */
+export async function dailyCalls(source: SourceFilter, days = 30) {
+  const src = srcClause(source);
+  const rows = await query<{ d: string; calls: string; leads: string }>(
+    `select to_char((started_at at time zone '${RULES.TIME_ZONE}')::date, 'YYYY-MM-DD') as d, count(*) as calls,
+       count(*) filter (where tier = 'green') as leads
+     from calls where started_at > now() - interval '${Math.max(1, Math.floor(days))} days' and ${src.sql} group by 1 order by 1`, src.params);
+  const byDay = new Map(rows.map((r) => [r.d, r]));
+  const out: { day: string; calls: number; leads: number }[] = [];
+  const today = new Date(new Date().toLocaleString("en-US", { timeZone: RULES.TIME_ZONE }));
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today); d.setDate(today.getDate() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    out.push({ day: key, calls: Number(byDay.get(key)?.calls ?? 0), leads: Number(byDay.get(key)?.leads ?? 0) });
+  }
+  return out;
 }

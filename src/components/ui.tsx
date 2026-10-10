@@ -69,14 +69,14 @@ export function href(base: string, params: Record<string, string | undefined>): 
   return s ? `${base}?${s}` : base;
 }
 
-const SOURCE_LABEL: Record<Source, string> = { all: "All calls", live: "Live calls", test: "Test data" };
+const SOURCE_LABEL: Record<Source, string> = { all: "All calls", live: "Live", test: "Test data" };
 
-export function SourceChips({ base, source, keep = {} }: { base: string; source: Source; keep?: Record<string, string | undefined> }) {
+/** Segmented switch for which calls to show. Keeps any other params you pass in `keep`. */
+export function SourceSwitch({ base, source, keep = {} }: { base: string; source: Source; keep?: Record<string, string | undefined> }) {
   return (
-    <nav className="chips" aria-label="Which calls to show">
-      <span className="chiplabel">Showing</span>
+    <nav className="seg" aria-label="Which calls to show">
       {(["all", "live", "test"] as const).map((s) => (
-        <Link key={s} className="chip" aria-current={source === s ? "true" : undefined} href={href(base, { ...keep, source: s })}>
+        <Link key={s} aria-current={source === s ? "true" : undefined} href={href(base, { ...keep, source: s })}>
           {SOURCE_LABEL[s]}
         </Link>
       ))}
