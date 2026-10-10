@@ -1,115 +1,192 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCall } from "@/lib/queries";
-import { reviewCall } from "@/app/actions";
-import { TierBadge, inr, when } from "@/components/ui";
+import { getCall, type ActionRecord, type CallRecord } from "@/lib/queries";
+import { dashboardUrl } from "@/lib/pipeline";
+import { noteForLead } from "@/lib/messages";
+import type { Lead } from "@/lib/integrations/types";
+import { CopyNote } from "@/components/CopyNote";
+import { ReviewPanel } from "@/components/ReviewPanel";
+import { TierBadge, actionWords, duration, inr, whenFull } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Call detail" };
 
 const CRIT: Record<string, string> = {
   real_project: "1. Real project", service_area: "2. Service area", timeline: "3. Timeline", budget: "4. Budget", decision_maker: "5. Decision-maker",
 };
+const STATUS_WORD: Record<string, string> = { met: "Met", unclear: "Unclear", failed: "Failed" };
 const STATUS_COLOR: Record<string, string> = { met: "var(--green)", unclear: "var(--amber)", failed: "var(--red)" };
+const TIER_NOUN: Record<string, string> = { green: "green", amber: "amber", red: "red", escalate: "escalated", dropped: "dropped" };
+
+/** Plain-words booking status for the summary card, also used in the copyable note. */
+function bookingFor(c: CallRecord, actions: ActionRecord[]): { text: string; note: string | null } {
+  const cal = actions.find((a) => a.channel === "calcom");
+  if (c.consultation_booked) {
+    const when = c.consultation_at ? whenFull(c.consultation_at) : "a time to be confirmed";
+    return { text: `Booked for ${when}`, note: `booked for ${when}` };
+  }
+  if (cal?.status === "failed") return { text: "Not booked: schedule it by hand", note: "NOT booked: please schedule manually" };
+  if (cal?.status === "skipped_test") return { text: `Not booked (test call). Preferred: ${c.fields?.preferred_consultation ?? "not given"}`, note: null };
+  if (cal?.status === "dry_run") return { text: "Not booked (integrations are off)", note: null };
+  if (c.tier === "green" || c.review_status === "approved") return { text: "Not booked yet", note: null };
+  return { text: "No booking: not a green lead", note: null };
+}
+
+function leadFrom(c: CallRecord): Lead {
+  const flags = c.flags ?? {};
+  return {
+    callId: c.id, phone: c.caller_phone, tier: c.tier ?? "amber", fields: c.fields, summary: c.handoff_summary ?? "",
+    reasons: c.reasons ?? [], uncertain: c.uncertain ?? [], askedAboutPrice: Boolean(flags.asked_about_price),
+    handleWithCare: flags.handle_with_care ?? null, repeatCaller: Boolean(flags.repeat_caller), recordingUrl: c.recording_url,
+    durationSeconds: c.duration_seconds, dashboardUrl: dashboardUrl(c.id),
+  };
+}
 
 export default async function CallPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const data = await getCall(id);
   if (!data) notFound();
   const { call: c, actions, runs } = data;
-  const f = (c.fields ?? {}) as Record<string, any>;
-  const flags = (c.flags ?? {}) as Record<string, any>;
-  const criteria = (c.criteria ?? null) as Record<string, { status: string; reason: string }> | null;
-  const reasons = (c.reasons ?? []) as string[];
-  const uncertain = (c.uncertain ?? []) as string[];
-  const fieldRows: [string, unknown][] = [
-    ["Name", f.name], ["Phone", c.caller_phone ?? f.phone], ["Project type", f.project_type], ["Space", f.business_type],
-    ["Location", f.location], ["Carpet area", f.carpet_area_sqft ? `${f.carpet_area_sqft} sq ft` : null], ["Scope", f.scope],
-    ["Timeline", f.timeline], ["Decision-maker", f.decision_maker], ["Preferred consultation", f.preferred_consultation],
-    ["Asked about price", c.fields ? (f.asked_about_price ? "Yes" : "No") : null], ["Volunteered budget", f.volunteered_budget],
+  const f = c.fields;
+  const flags = c.flags ?? {};
+  const reasons = c.reasons ?? [];
+  const uncertain = c.uncertain ?? [];
+  const scored = c.status === "processed" && c.tier;
+  const booking = bookingFor(c, actions);
+  const note = scored ? noteForLead(leadFrom(c), booking.note) : null;
+  const name = f?.name ?? c.caller_phone ?? "Unknown caller";
+
+  const fieldRows: [string, string | null][] = [
+    ["Name", f?.name ?? null], ["Phone", c.caller_phone ?? f?.phone ?? null], ["Project type", f?.project_type ?? null], ["Space", f?.business_type ?? null],
+    ["Location", f?.location ?? null], ["Carpet area", f?.carpet_area_sqft ? `${f.carpet_area_sqft.toLocaleString("en-IN")} sq ft` : null],
+    ["Scope", f?.scope ?? null], ["Timeline", f?.timeline ?? null], ["Decision-maker", f?.decision_maker ?? null],
+    ["Preferred consultation", f?.preferred_consultation ?? null], ["Asked about price", f ? (f.asked_about_price ? "Yes" : "No") : null],
+    ["Volunteered budget", f?.volunteered_budget ?? null],
   ];
+  const decided = c.review_status === "approved" ? "approved and handed off" : c.review_status === "dropped" ? "dropped" : null;
 
   return (
     <>
-      <p style={{ marginTop: 18 }}><Link href="/" className="muted">← All calls</Link></p>
-      <h1>
-        {f.name ?? c.caller_phone ?? "Unknown caller"} <TierBadge tier={c.tier} />
-        {c.source === "test" && <span className="tag">test{c.fixture_id ? ` ${c.fixture_id}` : ""}</span>}
-      </h1>
-      <p className="sub">{when(c.started_at)} · {Math.floor(c.duration_seconds / 60)}m {c.duration_seconds % 60}s · {c.outcome ?? c.status}</p>
-      {c.error && <p style={{ color: "var(--red)" }}>Error: {c.error}</p>}
+      <Link href="/" className="back">← All calls</Link>
+      <h1>{name}</h1>
+      <p className="sub num">
+        {whenFull(c.started_at)} · {duration(c.duration_seconds)} ·{" "}
+        <span className={`tag${c.source === "live" ? " live" : ""}`}>{c.source === "live" ? "Live call" : `Test call${c.fixture_id ? ` ${c.fixture_id}` : ""}`}</span>
+      </p>
+      {c.error && <p className="banner err" role="alert">This call could not be processed: {c.error}</p>}
+      {c.status !== "processed" && !c.error && <p className="banner warn" role="status">Still being processed. Refresh in a minute.</p>}
 
-      {(flags.asked_about_price || flags.handle_with_care || flags.repeat_caller) && (
-        <div className="chips">
-          {flags.asked_about_price && <span className="tag flag">Asked about price (no figure quoted)</span>}
-          {flags.handle_with_care && <span className="tag flag">Handle with care: {flags.handle_with_care}</span>}
-          {flags.repeat_caller && <span className="tag">Repeat caller</span>}
+      <section className="panel summary" aria-label="Summary">
+        <div className="head">
+          <TierBadge tier={c.tier} large />
+          <b>{c.outcome ?? (c.status === "processed" ? "Done" : "Processing")}</b>
         </div>
+
+        {reasons.length > 0 && (
+          <>
+            <h3 style={{ marginBottom: 0 }}>Why {c.tier ? TIER_NOUN[c.tier] : "this tier"}</h3>
+            <ul className="why">{reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+          </>
+        )}
+
+        <p className="handoff">{c.handoff_summary ?? "Not scored yet."}</p>
+
+        <dl className="facts">
+          <div><dt>Consultation</dt><dd>{booking.text}</dd></div>
+          <div>
+            <dt>Flags</dt>
+            <dd>
+              {!flags.asked_about_price && !flags.handle_with_care && !flags.repeat_caller && <span className="muted">None</span>}
+              <span className="tags">
+                {flags.asked_about_price && <span className="tag flag">Asked about price (no figure quoted)</span>}
+                {flags.handle_with_care && <span className="tag flag">Handle with care: {flags.handle_with_care}</span>}
+                {flags.repeat_caller && <span className="tag">Repeat caller</span>}
+              </span>
+            </dd>
+          </div>
+        </dl>
+
+        {uncertain.length > 0 && (
+          <>
+            <h3 style={{ marginBottom: 0 }}>Please check</h3>
+            <ul className="why">{uncertain.map((u, i) => <li key={i}>{u}</li>)}</ul>
+          </>
+        )}
+
+        {note && <div style={{ marginTop: "var(--s-4)" }}><CopyNote text={note} /></div>}
+      </section>
+
+      {(c.tier === "amber" || c.tier === "red") && (c.review_status === "pending" || decided) && (
+        <ReviewPanel id={c.id} pending={c.review_status === "pending"} tier={c.tier} decided={decided} />
       )}
 
-      {c.review_status === "pending" && (
-        <div className="panel" style={{ margin: "12px 0", borderColor: "var(--amber)" }}>
-          <b>{c.tier === "red" ? "Logged for a designer to check before it is dropped." : "Needs a designer's decision."}</b>
-          <div className="muted small">Approve runs the same handoff as a green lead (HubSpot, consultation booking, Telegram). Drop closes it.</div>
-          <form action={reviewCall} className="btns">
-            <input type="hidden" name="id" value={c.id} />
-            <button className="b primary" name="decision" value="approve">Approve and hand off</button>
-            <button className="b" name="decision" value="drop">Drop lead</button>
-          </form>
-        </div>
-      )}
+      <div className="two">
+        <section className="panel" aria-label="Extracted fields">
+          <h2>What the caller told us</h2>
+          <dl className="kv">
+            {fieldRows.map(([k, v]) => (
+              <div key={k} style={{ display: "contents" }}>
+                <dt>{k}</dt>
+                <dd>{v ? v : <span className="muted">Not captured</span>}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
 
-      <div className="panel" style={{ margin: "12px 0" }}>
-        <h2 style={{ marginTop: 0 }}>Handoff note</h2>
-        <p style={{ margin: 0 }}>{c.handoff_summary ?? "Not scored yet."}</p>
-        {uncertain.length > 0 && (<><h2>Uncertain, please check</h2><ul className="clean">{uncertain.map((u, i) => <li key={i}>{u}</li>)}</ul></>)}
+        <section className="panel" aria-label="Rubric">
+          <h2>Founder&apos;s rubric</h2>
+          {c.criteria && c.tier !== "escalate" ? (
+            <dl className="kv">
+              {Object.entries(c.criteria).map(([k, v]) => (
+                <div key={k} style={{ display: "contents" }}>
+                  <dt>{CRIT[k] ?? k}</dt>
+                  <dd><b style={{ color: STATUS_COLOR[v.status] }}>{STATUS_WORD[v.status] ?? v.status}</b> <span className="muted small">{v.reason}</span></dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="muted">Not scored: {c.tier === "escalate" ? "an existing-client complaint skips scoring" : "there was nothing to score"}.</p>
+          )}
+        </section>
       </div>
 
       <div className="two">
-        <div className="panel">
-          <h2 style={{ marginTop: 0 }}>Extracted fields</h2>
-          <dl>{fieldRows.map(([k, v]) => (<><dt key={`k${k}`}>{k}</dt><dd key={`v${k}`}>{v == null || v === "" ? <span className="muted">-</span> : String(v)}</dd></>))}</dl>
-        </div>
-        <div className="panel">
-          <h2 style={{ marginTop: 0 }}>Rubric</h2>
-          {criteria && c.tier !== "escalate" ? (
-            <dl>{Object.entries(criteria).map(([k, v]) => (<><dt key={`k${k}`}>{CRIT[k] ?? k}</dt><dd key={`v${k}`}><b style={{ color: STATUS_COLOR[v.status] }}>{v.status}</b> <span className="muted small">{v.reason}</span></dd></>))}</dl>
-          ) : <p className="muted">Not scored ({c.tier === "escalate" ? "existing-client complaint skips scoring" : "no details to score"}).</p>}
-          {reasons.length > 0 && (<><h2>Why this tier</h2><ul className="clean">{reasons.map((r, i) => <li key={i}>{r}</li>)}</ul></>)}
-        </div>
-      </div>
-
-      <div className="two" style={{ marginTop: 16 }}>
-        <div className="panel">
-          <h2 style={{ marginTop: 0 }}>What happened next</h2>
-          {actions.length === 0 ? <p className="muted">Nothing sent.</p> : (
-            <ul className="clean">
-              {actions.map((a: any) => (
-                <li key={a.id}>
-                  <b>{a.channel}</b> <span className="tag">{String(a.status).replace("_", " ")}</span>
-                  {a.detail?.kind && <span className="muted small"> {String(a.detail.kind).replace("_", " ")}</span>}
-                  {a.detail?.error && <div className="small" style={{ color: "var(--red)" }}>{String(a.detail.error)}</div>}
-                  {a.detail?.preview && typeof a.detail.preview === "string" && <details><summary className="small muted">Message</summary><pre className="tx small">{a.detail.preview}</pre></details>}
-                </li>
-              ))}
+        <section className="panel" aria-label="What happened next">
+          <h2>What happened next</h2>
+          {actions.length === 0 ? (
+            <p className="muted">Nothing was sent.</p>
+          ) : (
+            <ul className="status-list">
+              {actions.map((a) => {
+                const w = actionWords(a);
+                return (
+                  <li key={a.id}>
+                    <b>{w.service}</b>
+                    <span style={{ color: w.tone === "err" ? "var(--red)" : w.tone === "ok" ? "var(--green)" : "var(--muted)" }}>{w.word}</span>
+                  </li>
+                );
+              })}
             </ul>
           )}
           {c.tier === "red" && <p className="muted small">Red leads are never sent to HubSpot.</p>}
-        </div>
-        <div className="panel">
-          <h2 style={{ marginTop: 0 }}>Cost of this call</h2>
-          <dl>
-            <dt>Voice</dt><dd>{inr(Number(c.voice_cost_inr), 4)}</dd>
-            <dt>Scoring (AI)</dt><dd>{inr(Number(c.ai_cost_inr), 4)}{runs[0] && <span className="muted small"> {runs[0].model}, {runs[0].input_tokens} in / {runs[0].output_tokens} out tokens</span>}</dd>
-            <dt>Total</dt><dd><b>{inr(Number(c.voice_cost_inr) + Number(c.ai_cost_inr), 4)}</b></dd>
+        </section>
+
+        <section className="panel" aria-label="Cost">
+          <h2>Cost of this call</h2>
+          <dl className="kv num">
+            <dt>Voice</dt><dd>{inr(Number(c.voice_cost_inr), 2)}</dd>
+            <dt>AI scoring</dt><dd>{inr(Number(c.ai_cost_inr), 2)}{runs[0] && <span className="muted small"> · {runs[0].model}</span>}</dd>
+            <dt>Total</dt><dd><b>{inr(Number(c.voice_cost_inr) + Number(c.ai_cost_inr), 2)}</b></dd>
           </dl>
-          {c.recording_url && <p><a href={c.recording_url} target="_blank" rel="noreferrer">Recording</a></p>}
-        </div>
+        </section>
       </div>
 
-      <div className="panel" style={{ marginTop: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Transcript</h2>
+      <section className="panel" style={{ marginTop: "var(--s-4)" }} aria-label="Transcript and recording">
+        <h2>Transcript and recording</h2>
+        {c.recording_url ? <p><a href={c.recording_url} target="_blank" rel="noreferrer">Open the recording</a></p> : <p className="muted small">No recording for this call.</p>}
         {c.transcript ? <pre className="tx">{c.transcript}</pre> : <p className="muted">No transcript: nothing was captured for this call.</p>}
-      </div>
+      </section>
     </>
   );
 }

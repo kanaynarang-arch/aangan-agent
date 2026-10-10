@@ -36,7 +36,7 @@ async function logAction(callId: string, a: ActionResult) {
   ]);
 }
 
-function dashboardUrl(callId: string): string {
+export function dashboardUrl(callId: string): string {
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
   const base = process.env.APP_URL ?? (vercel ? `https://${vercel}` : "");
   return `${base}/calls/${callId}`;
@@ -181,11 +181,11 @@ export function normalisePhone(p: string | null): string | null {
   return d.length > 10 ? d.slice(-10) : d;
 }
 
-/** A designer approves an amber/red lead: run the same outputs as a green lead. */
-export async function approveReview(callId: string): Promise<void> {
+/** A designer approves an amber/red lead: run the same outputs as a green lead, and say plainly what happened. */
+export async function approveReview(callId: string): Promise<{ ok: boolean; message: string }> {
   const rows = await query<CallRow>("select * from calls where id = $1 and review_status = 'pending'", [callId]);
   const call = rows[0];
-  if (!call) return;
+  if (!call) return { ok: false, message: "This lead was already decided." };
   const flags = call.flags ?? {};
   const lead: Lead = {
     callId, phone: call.caller_phone, tier: "green", fields: call.fields, summary: call.handoff_summary ?? "",
@@ -193,9 +193,14 @@ export async function approveReview(callId: string): Promise<void> {
     uncertain: call.uncertain ?? [], askedAboutPrice: Boolean(flags.asked_about_price), handleWithCare: flags.handle_with_care ?? null,
     repeatCaller: Boolean(flags.repeat_caller), recordingUrl: call.recording_url, durationSeconds: call.duration_seconds, dashboardUrl: dashboardUrl(callId),
   };
-  const out = await route(modeFor(call.source), lead, callId);
+  const mode = modeFor(call.source);
+  const out = await route(mode, lead, callId);
   await query(
     "update calls set review_status = 'approved', outcome = $2, consultation_booked = $3, consultation_at = $4 where id = $1",
     [callId, out.failures.length ? `Approved by designer (integration problem: ${out.failures.join(", ")})` : "Approved by designer, handed off", out.booked, out.bookedAt],
   );
+  if (out.failures.length) return { ok: true, message: `Approved, but these did not go through: ${out.failures.join(", ")}. See "What happened next" below.` };
+  if (mode === "test") return { ok: true, message: "Approved. This is a test call, so nothing was sent to HubSpot, Telegram or Cal.com." };
+  if (mode === "dry") return { ok: true, message: "Approved. Integrations are switched off, so nothing was sent." };
+  return { ok: true, message: out.booked ? "Approved. Sent to HubSpot and Telegram, and the consultation is booked." : "Approved. Sent to HubSpot and Telegram." };
 }
