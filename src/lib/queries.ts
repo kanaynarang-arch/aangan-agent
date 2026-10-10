@@ -8,9 +8,10 @@ export type ListFilter = "all" | "verify" | "urgent" | "handed";
 export interface CallListItem {
   id: string; source: "live" | "test"; fixture_id: string | null; caller_phone: string | null; started_at: string;
   duration_seconds: number; tier: string | null; status: string; outcome: string | null; review_status: string;
-  fields: { name?: string | null; location?: string | null; scope?: string | null } | null;
+  fields: ScoreOutput["fields"] | null;
   flags: CallFlags | null;
   consultation_booked: boolean;
+  outside_hours: boolean;
 }
 
 export interface CallFlags {
@@ -102,7 +103,7 @@ export async function listCalls(filter: ListFilter, source: SourceFilter, opts: 
     where.push(`(${ors.join(" or ")})`);
   }
   return query<CallListItem>(
-    `select id, source, fixture_id, caller_phone, started_at, duration_seconds, tier, status, outcome, review_status, fields, flags, consultation_booked
+    `select id, source, fixture_id, caller_phone, started_at, duration_seconds, tier, status, outcome, review_status, fields, flags, consultation_booked, outside_hours
      from calls where ${where.join(" and ")} order by started_at desc limit 200`,
     params,
   );
@@ -160,4 +161,27 @@ export async function pipelineMetrics(source: SourceFilter) {
     tiers: Object.fromEntries(tiers.map((x) => [x.tier, +x.n])) as Record<string, number>,
     monthly: monthly.map((m) => ({ month: m.month, calls: +m.calls, voice: +m.voice, ai: +m.ai, total: +m.voice + +m.ai })),
   };
+}
+
+export interface StandupLead {
+  id: string; started_at: string; tier: string | null; review_status: string; consultation_booked: boolean; outside_hours: boolean;
+  fields: { name?: string | null; location?: string | null; scope?: string | null } | null; caller_phone: string | null;
+}
+
+/** What Nikhil needs for his morning standup: the last 24 hours at a glance. No transcripts, no raw call text. */
+export async function standupSummary(source: SourceFilter) {
+  const src = srcClause(source);
+  const [t] = await query<Record<string, string>>(
+    `select count(*) as calls,
+       count(*) filter (where tier = 'green') as leads,
+       count(*) filter (where review_status = 'pending') as waiting,
+       count(*) filter (where tier in ('escalate','dropped')) as urgent,
+       count(*) filter (where consultation_booked) as booked,
+       count(*) filter (where outside_hours) as after_hours
+     from calls where started_at > now() - interval '24 hours' and ${src.sql}`, src.params);
+  const recent = await query<StandupLead>(
+    `select id, started_at, tier, review_status, consultation_booked, outside_hours, fields, caller_phone
+     from calls where started_at > now() - interval '24 hours' and tier in ('green','amber','escalate') and ${src.sql}
+     order by started_at desc limit 8`, src.params);
+  return { calls: +t.calls, leads: +t.leads, waiting: +t.waiting, urgent: +t.urgent, booked: +t.booked, afterHours: +t.after_hours, recent };
 }
