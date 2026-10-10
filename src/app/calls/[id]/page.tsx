@@ -109,7 +109,7 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
   const live = c.source === "live";
   const mode = callbackMode();
   const elig = callbackEligibility(c, callbacks, new Date(), mode);
-  const showCallback = Boolean(scored) && (elig.ok || callbacks.length > 0 || c.tier === "dropped" || c.tier === "green" || c.tier === "amber");
+  const showCallback = Boolean(scored) && (c.tier === "dropped" || callbacks.length > 0) && !c.callback_of;
 
   return (
     <>
@@ -123,6 +123,7 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
             <span>{duration(c.duration_seconds)}</span>
             <span className={`tag${live ? " live" : ""}`}>{live ? "Live call" : `Test call${c.fixture_id ? ` ${c.fixture_id}` : ""}`}</span>
             {c.outside_hours && <span className="tag"><Icon name="moon" />After hours</span>}
+            {c.callback_of && <Link className="tag" href={`/calls/${c.callback_of}`}>Lead from a callback</Link>}
           </div>
         </div>
       </header>
@@ -214,7 +215,9 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
             <section className="card" aria-label="Callback by Vani">
               <h2>Callback by Vani</h2>
               <p className="small muted" style={{ margin: "var(--s-2) 0 var(--s-3)" }}>
-                {mode === "phone" ? "Vani can ring this person back and ask only what is still missing." : "Vani can take the call back and ask only what is still missing. Try it here without a phone number."}
+                {mode === "phone"
+                  ? "This call ended before any details were captured, so there is no lead yet. Vani can ring them back and take the enquiry. What it learns becomes a new lead, scored like any other."
+                  : "This call ended before any details were captured, so there is no lead yet. Vani calls back to take the enquiry, and what it learns becomes a new lead. With no phone number connected, you play the caller here and it creates a test lead."}
               </p>
               <CallbackPanel id={c.id} mode={mode} blocked={elig.ok ? null : elig.why} phoneLabel={toE164(c.caller_phone)} />
               {callbacks.length > 0 && (
@@ -226,6 +229,7 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
                         <span>
                           <small>{whenFull(cb.created_at)} · {cb.mode === "phone" ? "Rang their phone" : "In the browser"} · {cb.status === "completed" ? duration(cb.duration_seconds) : cb.status === "failed" ? "Did not start" : "In progress or waiting for the transcript"}</small>
                           {cb.status === "failed" && <span className="muted small">{cb.error}</span>}
+                          {cb.lead_call_id && <Link className="b sm" style={{ margin: "var(--s-2) 0" }} href={`/calls/${cb.lead_call_id}`}>Open the lead it created</Link>}
                           {cb.recording_url && <a className="b sm" style={{ margin: "var(--s-2) 0" }} href={cb.recording_url} target="_blank" rel="noreferrer">Open the recording</a>}
                           {cb.transcript && <Transcript text={cb.transcript} />}
                         </span>

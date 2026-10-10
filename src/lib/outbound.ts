@@ -1,4 +1,6 @@
 import { query } from "./db";
+import { processCall } from "./pipeline";
+import type { VaniCall } from "./vani";
 import { captureSummary } from "./capture";
 import { buildCallbackPrompt, callbackGreeting, type CallbackBrief, type CallbackReason } from "./callback-prompt";
 import { isOutsideHours } from "./time";
@@ -29,24 +31,22 @@ export function toE164(phone: string | null | undefined): string | null {
 }
 
 /**
- * Whether the agent may make this callback.
- * Always: never an unhappy existing client (a senior person calls those), never a lead closed politely, and only when there is something to ask.
- * Phone mode adds the rules that protect a real person: live callers only, a dialable number, 10am to 7pm India time, no double ringing.
+ * Whether the agent may make this callback. A callback exists to turn a dropped call into a lead, so it is only for dropped calls
+ * that nobody has followed up. It never rings someone who is already a lead, an unhappy existing client (a senior person calls those),
+ * or a call that was itself a callback. Phone mode adds the rules that protect a real person: live callers only, a dialable number,
+ * 10am to 7pm India time, no double ringing.
  */
 export function callbackEligibility(
-  c: Pick<CallRecord, "source" | "tier" | "status" | "caller_phone" | "fields">,
+  c: Pick<CallRecord, "source" | "tier" | "status" | "caller_phone" | "fields"> & { callback_of?: string | null },
   prior: PriorAttempt[],
   now: Date,
   mode: CallbackMode = "browser",
 ): Eligibility {
   if (c.status !== "processed" || !c.tier) return { ok: false, why: "This call is still being processed." };
+  if (c.callback_of) return { ok: false, why: "This call is itself a callback, so it is not rung again." };
   if (c.tier === "escalate") return { ok: false, why: "An unhappy existing client should hear from a senior person, not the agent." };
-  if (c.tier === "red") return { ok: false, why: "This enquiry was closed politely, so there is no callback." };
-  let reason: CallbackReason = "follow_up";
-  if (c.tier === "dropped") reason = "dropped";
-  else if (captureSummary(c.fields, c.caller_phone).toCover.filter((t) => t.startsWith("Ask:")).length === 0) {
-    return { ok: false, why: "Everything the agent asks was already captured, so there is nothing to call back about." };
-  }
+  if (c.tier !== "dropped") return { ok: false, why: "This call already produced a lead, so there is nothing to call back for." };
+  const reason: CallbackReason = "dropped";
   if (mode === "browser") return { ok: true, reason, phone: toE164(c.caller_phone) };
 
   if (c.source !== "live") return { ok: false, why: "Test calls are not rung, because their phone numbers are made up." };
@@ -140,4 +140,28 @@ export async function startCallback(callId: string, now = new Date()): Promise<S
   } catch (err) {
     return fail((err as Error).message, "Could not reach Vani. Nothing was started. Please try again.");
   }
+}
+
+interface OutboundRow { id: string; call_id: string; mode: CallbackMode; to_phone: string | null }
+
+/**
+ * The callback's conversation becomes a new call, linked to the dropped one, and goes through the normal pipeline: scored, tiered and
+ * routed like any enquiry. A browser rehearsal is always test data, even on a live lead, so no real person's number or details
+ * can reach HubSpot, Telegram or Cal.com from someone playing the caller.
+ */
+export async function createLeadFromCallback(cb: OutboundRow, call: VaniCall): Promise<string | null> {
+  if (!call.transcript || !call.vaniCallId) return null;
+  const [orig] = await query<{ source: "live" | "test"; caller_phone: string | null }>("select source, caller_phone from calls where id = $1", [cb.call_id]);
+  if (!orig) return null;
+  const source = cb.mode === "phone" ? orig.source : "test";
+  const phone = cb.mode === "phone" || orig.source === "test" ? orig.caller_phone : null;
+  const rows = await query<{ id: string }>(
+    `insert into calls (source, vani_call_id, caller_phone, started_at, duration_seconds, recording_url, transcript, outside_hours, callback_of)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict (vani_call_id) do nothing returning id`,
+    [source, `callback:${cb.id}`, phone, call.startedAt.toISOString(), call.durationSeconds, call.recordingUrl, call.transcript, isOutsideHours(call.startedAt), cb.call_id],
+  );
+  if (!rows.length) return null;
+  await query("update outbound_calls set lead_call_id = $2 where id = $1", [cb.id, rows[0].id]);
+  await processCall(rows[0].id);
+  return rows[0].id;
 }

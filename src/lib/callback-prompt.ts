@@ -1,6 +1,7 @@
 import { RULES } from "./rules";
 
-export type CallbackReason = "dropped" | "follow_up";
+/** Only dropped calls are rung back: they are the ones that never became a lead. */
+export type CallbackReason = "dropped";
 
 export interface CallbackBrief {
   name: string | null;
@@ -14,9 +15,7 @@ export interface CallbackBrief {
 /** First thing the agent says when the person picks up. It states who is calling and why, before asking anything. */
 export function callbackGreeting(b: CallbackBrief): string {
   const hi = b.name ? `Hello ${b.name}` : "Hello";
-  return b.reason === "dropped"
-    ? `${hi}, this is Aangan Studio's assistant. Your call to us got cut off earlier, so I am calling back. Is this a good moment for a minute?`
-    : `${hi}, this is Aangan Studio's assistant, calling back about your interior design enquiry. I have just a couple of quick questions to finish your details. Is now a good moment?`;
+  return `${hi}, this is Aangan Studio's assistant. Your call to us got cut off earlier, so I am calling back to take your details. Is this a good moment for a minute?`;
 }
 
 /**
@@ -24,9 +23,7 @@ export function callbackGreeting(b: CallbackBrief): string {
  * Same rules as the inbound prompt: no price, no budget question, no booked slot. Built from RULES so the two never drift apart.
  */
 export function buildCallbackPrompt(b: CallbackBrief): string {
-  const why = b.reason === "dropped"
-    ? "The person phoned Aangan Studio earlier and the call ended before the studio had their details. You are calling them back to take the details."
-    : "The person phoned Aangan Studio earlier and gave some details. You are calling back only to ask the few things that are still missing.";
+  const why = "The person phoned Aangan Studio earlier and the call ended before the studio had their details, so there is no enquiry on file yet. You are calling them back to take the enquiry, exactly as if they had called and you had answered.";
   return `# Role
 You are the phone assistant for Aangan Studio, an interior design studio in Pune. You are CALLING a person back; they did not call you just now. ${why}
 Always introduce yourself as "Aangan Studio's assistant". If they ask whether you are a person or a machine, say honestly that you are an AI assistant.

@@ -56,7 +56,7 @@ npm run dev                   # http://localhost:3000
 
 | Service | Used for | Env |
 |---|---|---|
-| Vani | Voice agent, transcripts, recordings, webhook, callbacks from the dashboard | `VANI_API_KEY`, `VANI_AGENT_ID`, `VANI_WEBHOOK_SECRET`, `VANI_PHONE_CALLBACKS` |
+| Vani | Voice agent, transcripts, recordings, webhook, callbacks from the dashboard | `VANI_API_KEY`, `VANI_AGENT_ID`, `VANI_WEBHOOK_SECRET`, `VANI_PHONE_CALLBACKS`, `AUTO_CALLBACK_DROPPED`, `CRON_SECRET` |
 | Gemini | Structured extraction and rubric scoring | `GEMINI_API_KEY` |
 | Neon | Postgres: calls, AI runs, integration actions | `DATABASE_URL` |
 | HubSpot | Contact and deal for green leads | `HUBSPOT_TOKEN` |

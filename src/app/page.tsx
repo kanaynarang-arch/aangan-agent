@@ -42,6 +42,7 @@ function LeadCard({ c }: { c: CallListItem }) {
           <Link className="name" href={`/calls/${c.id}`}>{f?.name ?? (c.caller_phone ? formatPhone(c.caller_phone) : "Unknown caller")}</Link>
           <span className="tags">
             <span className={`tag${live ? " live" : ""}`}>{live ? "Live" : `Test${c.fixture_id ? ` ${c.fixture_id}` : ""}`}</span>
+            {c.callback_of && <span className="tag" title="Created when Vani called back a dropped call">From a callback</span>}
             {c.outside_hours && <span className="tag" title="Came in outside 10am to 7pm, when the front desk is closed"><Icon name="moon" />After hours</span>}
             {c.flags?.asked_about_price && <span className="tag flag">Asked price</span>}
             {c.flags?.handle_with_care && <span className="tag flag">Handle with care</span>}

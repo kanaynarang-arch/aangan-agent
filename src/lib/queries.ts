@@ -12,6 +12,7 @@ export interface CallListItem {
   flags: CallFlags | null;
   consultation_booked: boolean;
   outside_hours: boolean;
+  callback_of: string | null;
 }
 
 export interface CallFlags {
@@ -44,6 +45,7 @@ export interface CallRecord {
   handoff_summary: string | null;
   consultation_booked: boolean;
   outside_hours: boolean;
+  callback_of: string | null;
   consultation_at: string | null;
   voice_cost_inr: string;
   ai_cost_inr: string;
@@ -104,7 +106,7 @@ export async function listCalls(filter: ListFilter, source: SourceFilter, opts: 
     where.push(`(${ors.join(" or ")})`);
   }
   return query<CallListItem>(
-    `select id, source, fixture_id, caller_phone, started_at, duration_seconds, tier, status, outcome, review_status, fields, flags, consultation_booked, outside_hours
+    `select id, source, fixture_id, caller_phone, started_at, duration_seconds, tier, status, outcome, review_status, fields, flags, consultation_booked, outside_hours, callback_of
      from calls where ${where.join(" and ")} order by started_at desc limit 200`,
     params,
   );
@@ -129,9 +131,9 @@ export async function filterCounts(source: SourceFilter) {
 }
 
 export interface CallbackRecord {
-  id: string; mode: "browser" | "phone"; reason: "dropped" | "follow_up"; status: "requested" | "completed" | "failed";
+  id: string; mode: "browser" | "phone"; reason: "dropped"; status: "requested" | "completed" | "failed";
   to_phone: string | null; duration_seconds: number; recording_url: string | null; transcript: string | null;
-  voice_cost_inr: string; error: string | null; created_at: string;
+  voice_cost_inr: string; error: string | null; created_at: string; lead_call_id: string | null;
 }
 
 export async function getCall(id: string) {
@@ -147,9 +149,9 @@ export async function getCall(id: string) {
 export async function pipelineMetrics(source: SourceFilter) {
   const src = srcClause(source);
   const [t] = await query<Record<string, string>>(
-    `select count(*) as received,
-       count(*) filter (where answered_at is not null and extract(epoch from (answered_at - started_at)) <= ${RULES.ANSWER_SLA_SECONDS}) as answered_5,
-       count(*) filter (where outside_hours) as outside,
+    `select count(*) filter (where callback_of is null) as received,
+       count(*) filter (where callback_of is null and answered_at is not null and extract(epoch from (answered_at - started_at)) <= ${RULES.ANSWER_SLA_SECONDS}) as answered_5,
+       count(*) filter (where callback_of is null and outside_hours) as outside,
        count(*) filter (where consultation_booked) as booked,
        count(*) filter (where status = 'failed') as failed,
        count(*) filter (where source = 'test') as test_calls,
@@ -161,12 +163,12 @@ export async function pipelineMetrics(source: SourceFilter) {
     `select to_char(started_at at time zone '${RULES.TIME_ZONE}', 'YYYY-MM') as month, count(*) as calls,
        sum(voice_cost_inr) as voice, sum(ai_cost_inr) as ai
      from calls where ${src.sql} group by 1 order by 1 desc limit 12`, src.params);
-  // Voice minutes spent on callbacks started from the dashboard count towards cost, but not towards calls received.
+  // A callback that became its own call is already costed as a call. Only callbacks with no lead (nobody spoke) add voice cost here.
   const [cb] = await query<{ voice: string }>(
-    `select coalesce(sum(o.voice_cost_inr),0) as voice from outbound_calls o join calls on calls.id = o.call_id where ${src.sql.replace(/\b(source|started_at)\b/g, "calls.$1")}`, src.params);
+    `select coalesce(sum(o.voice_cost_inr),0) as voice from outbound_calls o join calls on calls.id = o.call_id where o.lead_call_id is null and ${src.sql.replace(/\b(source|started_at)\b/g, "calls.$1")}`, src.params);
   const cbMonthly = await query<{ month: string; voice: string }>(
     `select to_char(o.created_at at time zone '${RULES.TIME_ZONE}', 'YYYY-MM') as month, sum(o.voice_cost_inr) as voice
-     from outbound_calls o join calls on calls.id = o.call_id where ${src.sql.replace(/\b(source|started_at)\b/g, "calls.$1")} group by 1`, src.params);
+     from outbound_calls o join calls on calls.id = o.call_id where o.lead_call_id is null and ${src.sql.replace(/\b(source|started_at)\b/g, "calls.$1")} group by 1`, src.params);
   const received = +t.received;
   const voice = +t.voice + +cb.voice, ai = +t.ai;
   return {
@@ -219,7 +221,7 @@ export async function hourlyCalls(source: SourceFilter) {
   const rows = await query<{ h: number; calls: string; leads: string }>(
     `select extract(hour from started_at at time zone '${RULES.TIME_ZONE}')::int as h, count(*) as calls,
        count(*) filter (where tier = 'green') as leads
-     from calls where ${src.sql} group by 1 order by 1`, src.params);
+     from calls where callback_of is null and ${src.sql} group by 1 order by 1`, src.params);
   const byHour = new Map(rows.map((r) => [r.h, r]));
   return Array.from({ length: 24 }, (_, h) => ({ hour: h, calls: Number(byHour.get(h)?.calls ?? 0), leads: Number(byHour.get(h)?.leads ?? 0) }));
 }
@@ -230,7 +232,7 @@ export async function dailyCalls(source: SourceFilter, days = 30) {
   const rows = await query<{ d: string; calls: string; leads: string }>(
     `select to_char((started_at at time zone '${RULES.TIME_ZONE}')::date, 'YYYY-MM-DD') as d, count(*) as calls,
        count(*) filter (where tier = 'green') as leads
-     from calls where started_at > now() - interval '${Math.max(1, Math.floor(days))} days' and ${src.sql} group by 1 order by 1`, src.params);
+     from calls where callback_of is null and started_at > now() - interval '${Math.max(1, Math.floor(days))} days' and ${src.sql} group by 1 order by 1`, src.params);
   const byDay = new Map(rows.map((r) => [r.d, r]));
   const out: { day: string; calls: number; leads: number }[] = [];
   const today = new Date(new Date().toLocaleString("en-US", { timeZone: RULES.TIME_ZONE }));

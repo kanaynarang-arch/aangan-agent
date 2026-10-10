@@ -24,35 +24,31 @@ describe("phone numbers", () => {
 });
 
 describe("who the agent may call back", () => {
-  it("works in the browser with no phone number, for live and test calls, at any hour", () => {
-    expect(callbackEligibility(lead({ caller_phone: null }), [], NIGHT, "browser").ok).toBe(true);
-    expect(callbackEligibility(lead({ source: "test" }), [], DAY, "browser").ok).toBe(true);
+  it("works in the browser with no phone number, for live and test dropped calls, at any hour", () => {
+    expect(callbackEligibility(lead({ tier: "dropped", fields: null, caller_phone: null }), [], NIGHT, "browser").ok).toBe(true);
+    expect(callbackEligibility(lead({ tier: "dropped", fields: null, source: "test" }), [], DAY, "browser").ok).toBe(true);
   });
-  it("never an unhappy existing client, and never a lead closed politely", () => {
+  it("only dropped calls: never someone who is already a lead, an unhappy client, a closed enquiry or a callback", () => {
     for (const mode of ["browser", "phone"] as const) {
-      expect(callbackEligibility(lead({ tier: "escalate" }), [], DAY, mode).ok).toBe(false);
-      expect(callbackEligibility(lead({ tier: "red" }), [], DAY, mode).ok).toBe(false);
+      for (const tier of ["green", "amber", "red", "escalate"]) expect(callbackEligibility(lead({ tier }), [], DAY, mode).ok, `${mode} ${tier}`).toBe(false);
+      expect(callbackEligibility(lead({ tier: "dropped", fields: null, callback_of: "x" }), [], DAY, mode).ok).toBe(false);
     }
   });
-  it("a dropped call is always worth finishing; a lead with nothing missing is not", () => {
-    expect(callbackEligibility(lead({ tier: "dropped", fields: null }), [], DAY, "browser")).toMatchObject({ ok: true, reason: "dropped" });
-    const full = fields({ timeline: "3 months", decision_maker: "self", preferred_consultation: "Sat 11am", phone: "9000000101" });
-    expect(callbackEligibility(lead({ fields: full }), [], DAY, "browser").ok).toBe(false);
-  });
   it("phone mode only rings real callers, during the day, and never twice in a row", () => {
-    expect(callbackEligibility(lead({ source: "test" }), [], DAY, "phone").ok).toBe(false);
-    expect(callbackEligibility(lead({ caller_phone: "12345" }), [], DAY, "phone").ok).toBe(false);
-    expect(callbackEligibility(lead(), [], NIGHT, "phone").ok).toBe(false);
-    expect(callbackEligibility(lead(), [], DAY, "phone")).toMatchObject({ ok: true, phone: "+919000000101" });
+    const d = (over: Record<string, unknown> = {}) => lead({ tier: "dropped", fields: null, ...over });
+    expect(callbackEligibility(d({ source: "test" }), [], DAY, "phone").ok).toBe(false);
+    expect(callbackEligibility(d({ caller_phone: "12345" }), [], DAY, "phone").ok).toBe(false);
+    expect(callbackEligibility(d(), [], NIGHT, "phone").ok).toBe(false);
+    expect(callbackEligibility(d(), [], DAY, "phone")).toMatchObject({ ok: true, phone: "+919000000101", reason: "dropped" });
     const justNow: PriorAttempt[] = [{ status: "requested", created_at: new Date(DAY.getTime() - 5 * 60_000).toISOString() }];
-    expect(callbackEligibility(lead(), justNow, DAY, "phone").ok).toBe(false);
+    expect(callbackEligibility(d(), justNow, DAY, "phone").ok).toBe(false);
     const two: PriorAttempt[] = [1, 2].map((n) => ({ status: "completed", created_at: new Date(DAY.getTime() - n * 3_600_000).toISOString() }));
-    expect(callbackEligibility(lead(), two, DAY, "phone").ok).toBe(false);
+    expect(callbackEligibility(d(), two, DAY, "phone").ok).toBe(false);
   });
 });
 
 describe("what the callback agent is told", () => {
-  const brief = briefFor(lead(), "follow_up");
+  const brief = briefFor(lead({ fields: fields({ location: "Baner" }) }), "dropped");
   it("lists what is known and only what is missing", () => {
     expect(brief.known.join("|")).toContain("Location: Baner");
     expect(brief.missing.join("|")).toContain("who will take the decision");
@@ -65,5 +61,15 @@ describe("what the callback agent is told", () => {
     expect(p).toMatch(/Never ask for budget/);
     expect(p).toMatch(/AI assistant/);
     for (const r of MONEY) expect(callbackGreeting(brief)).not.toMatch(r);
+  });
+});
+
+import { autoCallbackEnabled } from "../src/lib/auto-callback";
+describe("automatic callbacks", () => {
+  it("need both switches on, so a missing phone number can never trigger a call", () => {
+    expect(autoCallbackEnabled({})).toBe(false);
+    expect(autoCallbackEnabled({ AUTO_CALLBACK_DROPPED: "true" })).toBe(false);
+    expect(autoCallbackEnabled({ VANI_PHONE_CALLBACKS: "true" })).toBe(false);
+    expect(autoCallbackEnabled({ VANI_PHONE_CALLBACKS: "true", AUTO_CALLBACK_DROPPED: "true" })).toBe(true);
   });
 });

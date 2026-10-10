@@ -9,6 +9,7 @@ import { droppedMessage, escalationMessage, handoffMessage, reviewMessage } from
 import { sendTelegram } from "./integrations/telegram";
 import { createContactAndDeal } from "./integrations/hubspot";
 import { bookConsultation } from "./integrations/calcom";
+import { autoCallbackDropped } from "./auto-callback";
 import { callDateLabel, isOutsideHours } from "./time";
 import { modeFor, type ActionResult, type Lead, type Mode } from "./integrations/types";
 
@@ -124,6 +125,10 @@ export async function processCall(callId: string, opts: { force?: boolean } = {}
       ],
     );
 
+    // A dropped live call is rung back by the agent when the studio has switched that on. It must never fail the call itself.
+    if (result.tier === "dropped") {
+      try { await autoCallbackDropped(callId); } catch (e) { console.error("auto callback failed", callId, (e as Error).message); }
+    }
   } catch (e) {
     await query("update calls set status = 'failed', error = $2 where id = $1", [callId, (e as Error).message.slice(0, 500)]);
     throw e;
