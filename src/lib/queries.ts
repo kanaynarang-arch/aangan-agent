@@ -128,13 +128,20 @@ export async function filterCounts(source: SourceFilter) {
   return { all: +x.all, verify: +x.verify, urgent: +x.urgent, handed: +x.handed };
 }
 
+export interface CallbackRecord {
+  id: string; mode: "browser" | "phone"; reason: "dropped" | "follow_up"; status: "requested" | "completed" | "failed";
+  to_phone: string | null; duration_seconds: number; recording_url: string | null; transcript: string | null;
+  voice_cost_inr: string; error: string | null; created_at: string;
+}
+
 export async function getCall(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const rows = await query<CallRecord>("select * from calls where id = $1", [id]);
   if (!rows[0]) return null;
   const actions = await query<ActionRecord>("select * from actions where call_id = $1 order by created_at", [id]);
   const runs = await query<AiRunRecord>("select * from ai_runs where call_id = $1 order by created_at", [id]);
-  return { call: rows[0], actions, runs };
+  const callbacks = await query<CallbackRecord>("select * from outbound_calls where call_id = $1 order by created_at desc", [id]);
+  return { call: rows[0], actions, runs, callbacks };
 }
 
 export async function pipelineMetrics(source: SourceFilter) {
@@ -154,13 +161,22 @@ export async function pipelineMetrics(source: SourceFilter) {
     `select to_char(started_at at time zone '${RULES.TIME_ZONE}', 'YYYY-MM') as month, count(*) as calls,
        sum(voice_cost_inr) as voice, sum(ai_cost_inr) as ai
      from calls where ${src.sql} group by 1 order by 1 desc limit 12`, src.params);
+  // Voice minutes spent on callbacks started from the dashboard count towards cost, but not towards calls received.
+  const [cb] = await query<{ voice: string }>(
+    `select coalesce(sum(o.voice_cost_inr),0) as voice from outbound_calls o join calls on calls.id = o.call_id where ${src.sql.replace(/\b(source|started_at)\b/g, "calls.$1")}`, src.params);
+  const cbMonthly = await query<{ month: string; voice: string }>(
+    `select to_char(o.created_at at time zone '${RULES.TIME_ZONE}', 'YYYY-MM') as month, sum(o.voice_cost_inr) as voice
+     from outbound_calls o join calls on calls.id = o.call_id where ${src.sql.replace(/\b(source|started_at)\b/g, "calls.$1")} group by 1`, src.params);
   const received = +t.received;
-  const voice = +t.voice, ai = +t.ai;
+  const voice = +t.voice + +cb.voice, ai = +t.ai;
   return {
     received, answered5: +t.answered_5, outside: +t.outside, booked: +t.booked, failed: +t.failed, testCalls: +t.test_calls,
     voice, ai, total: voice + ai, perCall: received ? (voice + ai) / received : 0,
     tiers: Object.fromEntries(tiers.map((x) => [x.tier, +x.n])) as Record<string, number>,
-    monthly: monthly.map((m) => ({ month: m.month, calls: +m.calls, voice: +m.voice, ai: +m.ai, total: +m.voice + +m.ai })),
+    monthly: monthly.map((m) => {
+      const extra = +(cbMonthly.find((x) => x.month === m.month)?.voice ?? 0);
+      return { month: m.month, calls: +m.calls, voice: +m.voice + extra, ai: +m.ai, total: +m.voice + extra + +m.ai };
+    }),
   };
 }
 

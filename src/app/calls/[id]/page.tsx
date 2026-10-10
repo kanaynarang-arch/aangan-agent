@@ -9,6 +9,8 @@ import { captureSummary } from "@/lib/capture";
 import { Icon } from "@/components/Icon";
 import { Transcript } from "@/components/Transcript";
 import { initials } from "@/lib/format";
+import { CallbackPanel } from "@/components/CallbackPanel";
+import { callbackEligibility, callbackMode, toE164 } from "@/lib/outbound";
 import { CopyNote } from "@/components/CopyNote";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { TierBadge, actionWords, duration, formatPhone, inr, telHref, whenFull } from "@/components/ui";
@@ -89,7 +91,7 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const data = await getCall(id);
   if (!data) notFound();
-  const { call: c, actions, runs } = data;
+  const { call: c, actions, runs, callbacks } = data;
   const f = c.fields;
   const flags = c.flags ?? {};
   const reasons = c.reasons ?? [];
@@ -105,6 +107,9 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
 
   const tel = c.source === "live" ? telHref(c.caller_phone) : null;
   const live = c.source === "live";
+  const mode = callbackMode();
+  const elig = callbackEligibility(c, callbacks, new Date(), mode);
+  const showCallback = Boolean(scored) && (elig.ok || callbacks.length > 0 || c.tier === "dropped" || c.tier === "green" || c.tier === "amber");
 
   return (
     <>
@@ -204,6 +209,33 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
               <p className="muted">{c.tier === "escalate" ? "This is an existing client who is unhappy, not a new enquiry. Call them back, and do not ask enquiry questions." : "Nothing to prepare: this call was not scored as an enquiry."}</p>
             )}
           </section>
+
+          {showCallback && (
+            <section className="card" aria-label="Callback by Vani">
+              <h2>Callback by Vani</h2>
+              <p className="small muted" style={{ margin: "var(--s-2) 0 var(--s-3)" }}>
+                {mode === "phone" ? "Vani can ring this person back and ask only what is still missing." : "Vani can take the call back and ask only what is still missing. Try it here without a phone number."}
+              </p>
+              <CallbackPanel id={c.id} mode={mode} blocked={elig.ok ? null : elig.why} phoneLabel={toE164(c.caller_phone)} />
+              {callbacks.length > 0 && (
+                <>
+                  <h3 className="subhead">Earlier callbacks</h3>
+                  <ul className="asked" style={{ gridTemplateColumns: "1fr" }}>
+                    {callbacks.map((cb) => (
+                      <li key={cb.id} style={{ gridTemplateColumns: "1fr" }}>
+                        <span>
+                          <small>{whenFull(cb.created_at)} · {cb.mode === "phone" ? "Rang their phone" : "In the browser"} · {cb.status === "completed" ? duration(cb.duration_seconds) : cb.status === "failed" ? "Did not start" : "In progress or waiting for the transcript"}</small>
+                          {cb.status === "failed" && <span className="muted small">{cb.error}</span>}
+                          {cb.recording_url && <a className="b sm" style={{ margin: "var(--s-2) 0" }} href={cb.recording_url} target="_blank" rel="noreferrer">Open the recording</a>}
+                          {cb.transcript && <Transcript text={cb.transcript} />}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </section>
+          )}
 
           <section className="card" aria-label="Transcript and recording">
             <h2>Transcript</h2>

@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { query } from "@/lib/db";
 import { isOutsideHours } from "@/lib/time";
 import { processCall } from "@/lib/pipeline";
+import { voiceCostInr } from "@/lib/cost";
 import { isFinalEvent, parseVaniPayload, verifySignature } from "@/lib/vani";
 
 export const maxDuration = 60;
@@ -30,6 +31,17 @@ export async function POST(req: Request) {
   if (!isFinalEvent(body)) return Response.json({ ok: true, ignored: body.event });
 
   const call = parseVaniPayload(body);
+
+  // A callback started from the dashboard: attach the conversation to the lead it was about. It is not a new enquiry,
+  // so it is not scored, counted as a received call, or sent to HubSpot, Telegram or Cal.com.
+  if (call.vaniCallId) {
+    const done = await query<{ id: string }>(
+      `update outbound_calls set status = 'completed', duration_seconds = $2, recording_url = $3, transcript = $4, voice_cost_inr = $5, completed_at = now()
+       where vani_call_id = $1 returning id`,
+      [call.vaniCallId, call.durationSeconds, call.recordingUrl, call.transcript, voiceCostInr(call.durationSeconds)],
+    );
+    if (done.length) return Response.json({ ok: true, callback: done[0].id });
+  }
   // Real phone calls are live. Web (WebRTC) test calls are stored as test data unless explicitly allowed.
   const source = call.isWebCall && process.env.TREAT_WEB_CALLS_AS_LIVE !== "true" ? "test" : "live";
   const explicit = typeof body.source === "string" && body.source === "test" ? "test" : source;
