@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { filterCounts, listCalls, TIER_OPTIONS, type ListFilter, type TierOption } from "@/lib/queries";
-import { TierBadge, SourceChips, duration, href, parseSource, when } from "@/components/ui";
+import { TierBadge, SourceChips, duration, formatPhone, href, parseSource, telHref, when } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Designer view" };
@@ -106,7 +106,12 @@ export default async function DesignerView({ searchParams }: { searchParams: Pro
                       {c.flags?.handle_with_care && <span className="tag flag">Handle with care</span>}
                       {c.flags?.repeat_caller && <span className="tag">Repeat caller</span>}
                     </div>
-                    {c.caller_phone && <div className="muted small num">{c.caller_phone}</div>}
+                    {c.caller_phone && (c.source === "live" && telHref(c.caller_phone)
+                      ? <div className="small num"><a className="calllink" href={telHref(c.caller_phone)!} aria-label={`Call ${formatPhone(c.caller_phone)}`}>{formatPhone(c.caller_phone)}</a></div>
+                      : <div className="muted small num">{formatPhone(c.caller_phone)}</div>)}
+                    {c.source === "live" && (c.tier === "dropped" || c.tier === "escalate") && telHref(c.caller_phone) && (
+                      <a className="b sm primary" href={telHref(c.caller_phone)!}>Call back</a>
+                    )}
                   </td>
                   <td data-label="Tier"><TierBadge tier={c.tier} /></td>
                   <td data-label="Status" className="small">

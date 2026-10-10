@@ -7,7 +7,7 @@ import { noteForLead } from "@/lib/messages";
 import type { Lead } from "@/lib/integrations/types";
 import { CopyNote } from "@/components/CopyNote";
 import { ReviewPanel } from "@/components/ReviewPanel";
-import { TierBadge, actionWords, duration, inr, whenFull } from "@/components/ui";
+import { TierBadge, actionWords, duration, formatPhone, inr, telHref, whenFull } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Call detail" };
@@ -151,6 +151,16 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
             <h3 style={{ marginBottom: 0 }}>Please check</h3>
             <ul className="why">{uncertain.map((u, i) => <li key={i}>{u}</li>)}</ul>
           </>
+        )}
+
+        {c.caller_phone && (
+          <div className="btns" style={{ marginTop: "var(--s-4)", alignItems: "center" }}>
+            {c.source === "live" && telHref(c.caller_phone) ? (
+              <a className={`b${c.tier === "dropped" || c.tier === "escalate" ? " primary" : ""}`} href={telHref(c.caller_phone)!}>Call back {formatPhone(c.caller_phone)}</a>
+            ) : (
+              <span className="muted small">Call back is switched off for test calls, because their phone numbers are made up.</span>
+            )}
+          </div>
         )}
 
         {note && <div style={{ marginTop: "var(--s-4)" }}><CopyNote text={note} /></div>}

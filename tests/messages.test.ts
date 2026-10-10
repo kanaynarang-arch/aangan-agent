@@ -80,3 +80,26 @@ describe("handoff and review notes", () => {
     expect(noteForLead(lead({ tier: "dropped" }), null)).toContain("DROPPED CALL");
   });
 });
+
+import { formatPhone, telHref } from "../src/components/ui";
+
+describe("call back links", () => {
+  it("builds a +91 tel link for Indian numbers in any common shape", () => {
+    expect(telHref("9000000101")).toBe("tel:+919000000101");
+    expect(telHref("09000000101")).toBe("tel:+919000000101");
+    expect(telHref("919000000101")).toBe("tel:+919000000101");
+    expect(telHref("+91 90000 00101")).toBe("tel:+919000000101");
+    expect(telHref("+14155550123")).toBe("tel:+14155550123");
+  });
+
+  it("refuses numbers that are too short or missing", () => {
+    expect(telHref("12345")).toBeNull();
+    expect(telHref("")).toBeNull();
+    expect(telHref(null)).toBeNull();
+  });
+
+  it("formats ten digits as 5 + 5 and leaves anything else alone", () => {
+    expect(formatPhone("9000000101")).toBe("90000 00101");
+    expect(formatPhone("+14155550123")).toBe("+14155550123");
+  });
+});

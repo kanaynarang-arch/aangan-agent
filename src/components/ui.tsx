@@ -39,6 +39,23 @@ export function duration(seconds: number): string {
   return m ? `${m} min ${String(s % 60).padStart(2, "0")} sec` : `${s} sec`;
 }
 
+/** A dialable tel: link, or null when the number is too short or odd to dial safely. Indian numbers get +91. */
+export function telHref(phone: string | null | undefined): string | null {
+  const raw = (phone ?? "").trim();
+  const d = raw.replace(/\D/g, "");
+  if (d.length === 10) return `tel:+91${d}`;
+  if (d.length === 11 && d.startsWith("0")) return `tel:+91${d.slice(1)}`;
+  if (d.length === 12 && d.startsWith("91")) return `tel:+${d}`;
+  if (raw.startsWith("+") && d.length >= 8 && d.length <= 15) return `tel:+${d}`;
+  return null;
+}
+
+/** "9000000101" becomes "90000 00101". Anything else is shown as given. */
+export function formatPhone(phone: string): string {
+  const d = phone.replace(/\D/g, "");
+  return d.length === 10 ? `${d.slice(0, 5)} ${d.slice(5)}` : phone;
+}
+
 export type Source = "all" | "live" | "test";
 export function parseSource(v: string | string[] | undefined): Source | null {
   return v === "all" || v === "live" || v === "test" ? v : null;
