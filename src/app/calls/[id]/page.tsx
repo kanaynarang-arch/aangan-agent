@@ -217,7 +217,7 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
               <p className="small muted" style={{ margin: "var(--s-2) 0 var(--s-3)" }}>
                 {mode === "phone"
                   ? "This call ended before any details were captured, so there is no lead yet. Vani can ring them back and take the enquiry. What it learns becomes a new lead, scored like any other."
-                  : "This call ended before any details were captured, so there is no lead yet. Vani calls back to take the enquiry, and what it learns becomes a new lead. With no phone number connected, you play the caller here and it creates a test lead."}
+                  : "This is a sample call with a made-up number, so Vani cannot ring anyone. To see the callback work, you can answer it here in your browser, as the caller would. It creates a test lead."}
               </p>
               <CallbackPanel id={c.id} mode={mode} blocked={elig.ok ? null : elig.why} phoneLabel={toE164(c.caller_phone)} />
               {callbacks.length > 0 && (

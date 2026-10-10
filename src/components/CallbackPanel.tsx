@@ -62,7 +62,7 @@ export function CallbackPanel({ id, mode, blocked, phoneLabel }: { id: string; m
       <div className="btns" style={{ marginTop: 0 }}>
         {(phase === "idle" || phase === "ended") && (
           <button type="button" className="b accent" onClick={() => (mode === "phone" ? setPhase("confirm") : start())}>
-            <Icon name="phone" />{mode === "phone" ? "Have Vani ring them" : "Talk to Vani as the caller"}
+            <Icon name="phone" />{mode === "phone" ? "Have Vani ring them" : "Demo: answer Vani's callback"}
           </button>
         )}
         {phase === "confirm" && (
@@ -76,9 +76,9 @@ export function CallbackPanel({ id, mode, blocked, phoneLabel }: { id: string; m
       </div>
       {phase === "confirm" && <p className="small muted">This is a real call. Vani will ring {phoneLabel ?? "this number"} and ask only what is still missing. It never quotes a price.</p>}
       {mode === "browser" && phase !== "live" && !msg && (
-        <p className="small muted">Opens a call in your browser, with no phone number needed. Vani starts exactly as it would on the lead&apos;s phone, and you play the lead. Nobody is rung.</p>
+        <p className="small muted">Demo for sample calls only. Vani opens the call in your browser and speaks first, exactly as it would when the caller picks up their phone. Answer as that caller would. Nobody is rung.</p>
       )}
-      {phase === "live" && <p className="banner ok" role="status">{msg?.text} Speak as the caller. Press End call when you are done.</p>}
+      {phase === "live" && <p className="banner ok" role="status">{msg?.text} Answer as the caller would. Press End call when you are done.</p>}
       {phase !== "live" && msg && <p className={`banner ${msg.ok ? "ok" : "err"}`} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
       {phase === "ended" && mode === "browser" && <p className="small muted">The call has ended. The conversation appears below in a minute or so.</p>}
       <div ref={audioRef} hidden />
