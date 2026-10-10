@@ -10,6 +10,7 @@
   /* Spacing scale */
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
   --radius: 12px;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -33,15 +34,16 @@ a { color: inherit; }
 header.top { display: flex; align-items: center; gap: var(--s-4) var(--s-5); padding: var(--s-4) 0 var(--s-3); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: var(--s-3); text-decoration: none; font-weight: 700; line-height: 1.2; }
 .brand .mark { width: 32px; height: 32px; flex: none; }
-.brand small { display: block; font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
+.brand small { display: block; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
 nav { display: flex; gap: var(--s-1); flex-wrap: wrap; }
 nav a { text-decoration: none; padding: var(--s-2) var(--s-4); border-radius: 999px; border: 1px solid transparent; color: var(--muted); font-weight: 500; min-height: 36px; display: inline-flex; align-items: center; }
 nav a:hover { border-color: var(--line); color: var(--ink); }
 nav a[aria-current="page"] { background: var(--ink); color: var(--bg); font-weight: 600; }
 
 main { padding-top: var(--s-2); }
-h1 { font-size: var(--fs-xl); line-height: 1.25; margin: var(--s-5) 0 var(--s-1); letter-spacing: -0.01em; }
-h2 { font-size: var(--fs-lg); line-height: 1.3; margin: var(--s-5) 0 var(--s-3); }
+h1, h2, .brand span { font-family: var(--serif); font-weight: 600; }
+h1 { font-size: 28px; line-height: 1.2; margin: var(--s-5) 0 var(--s-1); letter-spacing: -0.01em; }
+h2 { font-size: 20px; line-height: 1.3; margin: var(--s-5) 0 var(--s-3); }
 h3 { font-size: var(--fs-md); margin: var(--s-4) 0 var(--s-2); }
 .sub { color: var(--muted); margin: 0 0 var(--s-2); }
 .note { color: var(--muted); font-size: var(--fs-sm); margin: var(--s-1) 0 var(--s-3); }
@@ -77,6 +79,9 @@ table { width: 100%; border-collapse: collapse; }
 th { text-align: left; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: var(--s-2) var(--s-3); }
 td { padding: var(--s-3); border-top: 1px solid var(--line); vertical-align: top; }
 tr.row:hover td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+tr.row td:first-child { border-left: 4px solid var(--edge, transparent); }
+tr.row.tier-green { --edge: var(--green); } tr.row.tier-amber { --edge: var(--amber); } tr.row.tier-red { --edge: var(--red); }
+tr.row.tier-escalate { --edge: var(--urgent); } tr.row.tier-dropped { --edge: var(--grey); }
 td a.rowlink { text-decoration: none; font-weight: 600; }
 td a.rowlink:hover { text-decoration: underline; }
 .tags { display: flex; gap: var(--s-1); flex-wrap: wrap; margin-top: 2px; }
@@ -90,6 +95,33 @@ td a.rowlink:hover { text-decoration: underline; }
 .tag { font-size: var(--fs-xs); padding: 1px 8px; min-height: 22px; display: inline-flex; align-items: center; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); background: var(--panel); }
 .tag.flag { color: var(--amber); border-color: var(--amber); background: var(--amber-bg); }
 .tag.live { color: var(--green); border-color: var(--green); background: var(--green-bg); }
+
+/* Callout: how many leads wait for a designer */
+.callout { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; border: 1px solid var(--amber); background: var(--amber-bg); color: var(--amber); border-radius: var(--radius); padding: var(--s-3) var(--s-4); margin: var(--s-3) 0; font-weight: 600; }
+.callout a { color: inherit; }
+
+/* Funnel: calls to leads to consultations */
+.funnel { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.funnel li { display: grid; grid-template-columns: minmax(120px, 190px) 1fr; gap: var(--s-1) var(--s-4); align-items: center; }
+.funnel .what b { display: block; font-size: var(--fs-xl); font-family: var(--serif); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.funnel .what span { color: var(--muted); font-size: var(--fs-sm); }
+.funnel .track { background: var(--grey-bg); border-radius: 8px; height: 22px; overflow: hidden; }
+.funnel .fill { height: 100%; border-radius: 8px; min-width: 4px; }
+.funnel .conv { color: var(--muted); font-size: var(--fs-sm); grid-column: 2; margin-top: -2px; }
+@media (max-width: 760px) { .funnel li { grid-template-columns: 1fr; } .funnel .conv { grid-column: 1; } }
+
+/* Vertical stepper on the call page */
+.timeline { list-style: none; margin: 0; padding: 0; }
+.timeline li { position: relative; padding: 0 0 var(--s-4) 40px; min-height: 32px; }
+.timeline li::before { content: ""; position: absolute; left: 11px; top: 26px; bottom: 2px; width: 2px; background: var(--line); }
+.timeline li:last-child { padding-bottom: 0; } .timeline li:last-child::before { display: none; }
+.timeline .dot { position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; border: 2px solid currentColor; background: var(--panel); line-height: 1; }
+.timeline .ok .dot, .timeline li.ok .dot { color: var(--green); } .timeline li.wait .dot { color: var(--amber); }
+.timeline li.skip .dot { color: var(--muted); } .timeline li.err .dot { color: var(--red); } .timeline li.alert .dot { color: var(--urgent); }
+.timeline h3 { margin: 0; font-size: var(--fs-md); font-family: inherit; line-height: 24px; }
+.timeline .sub-lines { margin: 2px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: var(--fs-sm); }
+.timeline .sub-lines li { padding: 0; min-height: 0; } .timeline .sub-lines li::before { display: none; }
+.timeline .tone-ok { color: var(--green); } .timeline .tone-err { color: var(--red); } .timeline .tone-muted { color: var(--muted); }
 
 /* Empty / status states */
 .empty { text-align: center; padding: var(--s-6) var(--s-4); color: var(--muted); }
@@ -136,7 +168,7 @@ details pre { margin-top: var(--s-2); }
 
 @media (max-width: 760px) {
   .two { grid-template-columns: 1fr; }
-  h1 { font-size: 21px; }
+  h1 { font-size: 24px; }
   .summary { padding: var(--s-4); }
   .summary .handoff { font-size: var(--fs-md); }
   dl.kv { grid-template-columns: 1fr; gap: 0 var(--s-4); } dl.kv dd { margin-bottom: var(--s-2); }
